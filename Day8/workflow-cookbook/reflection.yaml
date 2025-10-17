@@ -1,0 +1,18 @@
+targets:
+  - name: unit
+    logs: ["logs/test.jsonl"]
+metrics:
+  - pass_rate
+  - duration_p95
+  - flaky_rate
+analysis:
+  engine: "heuristic"     # "heuristic"|"llm"
+  llm_model: "gpt-4.1-mini"
+  max_tokens: 0           # 初日は0＝オフ（資金/レート対策）
+actions:
+  suggest_issues: true
+  open_pr_as_draft: true
+  auto_fix: false         # 自動修正しない（安全デチューン）
+report:
+  output: "reports/today.md"
+  include_why_why: true

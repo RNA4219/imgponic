@@ -1,0 +1,15 @@
+{
+  "id": "governance/policy.yaml",
+  "role": "governance",
+  "public_api": [],
+  "summary": "自己改変禁止パス、ヒューマン承認境界、カナリア中止条件、SLO指標を規定するガバナンスポリシー。",
+  "deps_out": [],
+  "deps_in": [
+    "README.md",
+    "HUB.codex.md",
+    "EVALUATION.md",
+    "CHANGELOG.md"
+  ],
+  "risks": [],
+  "tests": []
+}

@@ -1,0 +1,27 @@
+{
+  "id": "tools/codemap/",
+  "role": "tooling",
+  "public_api": ["codemap.update"],
+  "summary": "Birdseyeのindex.jsonとcaps/*.jsonを再生成するツール群を配置し、更新コマンドの入口を提供する。",
+  "deps_out": [
+    "docs/birdseye/index.json",
+    "docs/birdseye/caps/",
+    "tools/codemap/README.md",
+    "tools/codemap/update.py"
+  ],
+  "deps_in": [
+    "README.md",
+    "HUB.codex.md",
+    "GUARDRAILS.md",
+    "docs/birdseye/index.json",
+    "docs/birdseye/caps/",
+    "tools/codemap/README.md",
+    "tools/codemap/update.py"
+  ],
+  "risks": [
+    "スクリプト未整備だとBirdseyeの鮮度を保てない"
+  ],
+  "tests": [
+    "python tools/codemap/update.py --help"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "id": "RUNBOOK.md",
+  "role": "operations",
+  "public_api": [],
+  "summary": "環境ごとの差分、準備→実行→確認の手順、監視ポイント、ロールバック方針をまとめた運用ガイド。",
+  "deps_out": [
+    "docs/IN-20250115-001.md"
+  ],
+  "deps_in": [
+    "README.md",
+    "HUB.codex.md",
+    "GUARDRAILS.md",
+    "EVALUATION.md",
+    "docs/IN-20250115-001.md"
+  ],
+  "risks": [],
+  "tests": [
+    "手動: Execute 手順をローカル環境でドライランして整合性を確認"
+  ]
+}

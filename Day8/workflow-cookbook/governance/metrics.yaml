@@ -1,0 +1,3 @@
+review_latency: 平均レビュー完了時間(h)
+reopen_rate: 再修正率(%)
+spec_completeness: 要件/仕様/設計が揃ったPR比率(%)

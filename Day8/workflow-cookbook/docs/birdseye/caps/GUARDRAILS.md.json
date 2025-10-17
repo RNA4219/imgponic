@@ -1,0 +1,31 @@
+{
+  "id": "GUARDRAILS.md",
+  "role": "policy",
+  "public_api": [],
+  "summary": "行動指針とBirdseye運用ルールを定義し、LLMが最小コンテキストで資料を走査するための手順を規定する。",
+  "deps_out": [
+    "docs/birdseye/caps/",
+    "docs/birdseye/index.json",
+    "README.md",
+    "HUB.codex.md",
+    "BLUEPRINT.md",
+    "EVALUATION.md",
+    "RUNBOOK.md",
+    "TASK.codex.md",
+    "CHANGELOG.md",
+    "CHECKLISTS.md",
+    "docs/INCIDENT_TEMPLATE.md",
+    "tools/codemap/",
+    "tools/codemap/README.md",
+    "tools/codemap/update.py",
+    "docs/IN-20250115-001.md"
+  ],
+  "deps_in": [
+    "README.md",
+    "HUB.codex.md"
+  ],
+  "risks": [
+    "Birdseye更新が遅れるとガードレール遵守が困難"
+  ],
+  "tests": []
+}
