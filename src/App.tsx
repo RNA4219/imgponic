@@ -5,7 +5,36 @@ import { save } from '@tauri-apps/api/dialog'
 import { writeTextFile } from '@tauri-apps/api/fs'
 import './app.css'
 
-type ComposeResult = { final_prompt: string; sha256: string; model: string }
+export type ComposeResult = { final_prompt: string; sha256: string; model: string }
+type InvokeFunction = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
+
+export const determineUserInput = (sendSelectionOnly: boolean, selection: string, leftText: string): string =>
+  sendSelectionOnly && selection ? selection : leftText
+
+export const composePromptWithSelection = async (
+  {
+    invokeFn = invoke,
+    params,
+    recipePath,
+    leftText,
+    sendSelectionOnly,
+    selection
+  }: {
+    invokeFn?: InvokeFunction
+    params: Record<string, unknown>
+    recipePath: string
+    leftText: string
+    sendSelectionOnly: boolean
+    selection: string
+  }
+): Promise<ComposeResult> => {
+  const userInput = determineUserInput(sendSelectionOnly, selection, leftText)
+  const res = await invokeFn('compose_prompt', { recipePath, inlineParams: { ...params, user_input: userInput } })
+  return res as ComposeResult
+}
+
+export const formatSelectionSummary = (sendSelectionOnly: boolean, selection: string, leftText: string): string =>
+  `送信文字数: 約${determineUserInput(sendSelectionOnly, selection, leftText).length}字`
 
 type Workspace = {
   version: number
@@ -65,6 +94,9 @@ export default function App() {
   // 実行ボタン演出
   const [running, setRunning] = useState(false)
   const runBtnRef = useRef<HTMLButtonElement>(null)
+  const leftTextRef = useRef<HTMLTextAreaElement>(null)
+  const [sendSelectionOnly, setSendSelectionOnly] = useState<boolean>(false)
+  const [leftSelection, setLeftSelection] = useState<string>('')
 
   // プロジェクトファイルパス（project/ 内相対）
   const [projRel, setProjRel] = useState('src/example.py')
@@ -123,11 +155,16 @@ export default function App() {
 
   // 合成
   const doCompose = useCallback(async () => {
-    const merged = { ...params, user_input: leftText }
-    const res = await invoke<ComposeResult>('compose_prompt', { recipePath, inlineParams: merged })
+    const res = await composePromptWithSelection({
+      params,
+      recipePath,
+      leftText,
+      sendSelectionOnly,
+      selection: leftSelection
+    })
     setComposed(res)
     return res
-  }, [params, leftText, recipePath])
+  }, [params, recipePath, leftText, sendSelectionOnly, leftSelection])
 
   // 実行（▶）
   const runOllama = useCallback(async () => {
@@ -140,12 +177,12 @@ export default function App() {
       const sys = at < 0 ? c.final_prompt : c.final_prompt.slice(0, at)
       const user = at < 0 ? '' : c.final_prompt.slice(at)
 
-      const res = await invoke<string>('run_ollama_chat', {
+      const res = await invoke('run_ollama_chat', {
         model: ollamaModel,
         systemText: sys,
         userText: user
       })
-      setRightText(res)
+      setRightText(res as string)
     } finally {
       setTimeout(() => runBtnRef.current?.classList.remove('active'), 120)
       setRunning(false)
@@ -155,6 +192,16 @@ export default function App() {
   // 右→左 反映（プレビュー付き）
   const diffFlow = useMemo(() => createDiffPreviewFlow({ readLeft: () => leftText, readRight: () => rightText, show: value => setDiffPatch(value), apply: value => setLeftText(value), close: () => setDiffPatch(null) }), [leftText, rightText])
   const { open: openDiffPreview, confirm: confirmDiffPreview, cancel: cancelDiffPreview } = diffFlow
+
+  const handleLeftSelection = useCallback((target: HTMLTextAreaElement) => {
+    const { selectionStart, selectionEnd, value } = target
+    setLeftSelection(selectionStart === selectionEnd ? '' : value.slice(selectionStart, selectionEnd))
+  }, [])
+
+  const handleLeftChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setLeftText(e.target.value)
+    handleLeftSelection(e.currentTarget)
+  }, [handleLeftSelection])
 
   // --- Project file helpers ---
   const openProjectToLeft = useCallback(async () => {
@@ -261,6 +308,11 @@ export default function App() {
         </div>
 
         <div className="right-actions">
+          <label className="toolbar" style={{ gap: 6, alignItems: 'center' }}>
+            <input type="checkbox" checked={sendSelectionOnly} onChange={e => setSendSelectionOnly(e.target.checked)} />
+            <span>選択のみ送る</span>
+            <span className="badge">{formatSelectionSummary(sendSelectionOnly, leftSelection, leftText)}</span>
+          </label>
           {composed && <div className="badge">SHA-256: {composed.sha256.slice(0,16)}…</div>}
           <button ref={runBtnRef} className={`btn primary runpulse ${running ? 'active' : ''}`} onClick={runOllama} disabled={running}>
             ▶ 実行（Ctrl/Cmd+Enter）
@@ -280,7 +332,7 @@ export default function App() {
             </span>
           </h3>
           <div className="area">
-            <textarea data-side="left" value={leftText} onChange={e => setLeftText(e.target.value)} />
+            <textarea data-side="left" ref={leftTextRef} value={leftText} onSelect={e => handleLeftSelection(e.currentTarget)} onChange={handleLeftChange} />
           </div>
         </div>
 
