@@ -1,0 +1,5 @@
+id: style.concise
+kind: style
+merge_strategy: append
+content: |
+  出力は箇条書き主体・見出し付き・200行以内。

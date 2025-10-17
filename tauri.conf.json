@@ -1,0 +1,37 @@
+{
+  "package": {
+    "productName": "PromptForge",
+    "version": "0.3.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": true,
+      "fs": {
+        "all": true
+      },
+      "path": {
+        "all": true
+      },
+      "shell": {
+        "all": false
+      },
+      "http": {
+        "request": true,
+        "scope": [
+          "http://localhost:11434/*"
+        ]
+      }
+    },
+    "windows": [
+      {
+        "title": "PromptForge",
+        "width": 1150,
+        "height": 820
+      }
+    ]
+  },
+  "build": {
+    "beforeDevCommand": "vite",
+    "beforeBuildCommand": "vite build"
+  }
+}

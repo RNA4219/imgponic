@@ -1,0 +1,21 @@
+﻿# Node / Vite
+node_modules/
+dist/
+*.log
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/**/bundle/
+
+# App artifacts
+runs/
+*.tmp
+*.bak
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*

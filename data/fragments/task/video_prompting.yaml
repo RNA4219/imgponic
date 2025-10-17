@@ -1,0 +1,7 @@
+id: task.video_prompting
+kind: task
+merge_strategy: append
+content: |
+  目的: {{goal}}
+  口調: {{tone}}
+  構成手順: {{steps}} ステップで分解して提示せよ。

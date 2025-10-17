@@ -1,0 +1,11 @@
+profile: llama3:8b
+fragments:
+  - system.core
+  - policy.injection_guard
+  - style.concise
+  - task.video_prompting
+  - constraints.no_tools
+params:
+  goal: "30秒の戦闘シーンの絵コンテ化"
+  tone: "冷静・手順重視"
+  steps: 6

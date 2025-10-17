@@ -1,0 +1,7 @@
+id: constraints.no_tools
+kind: constraints
+trust: authoritative
+merge_strategy: append
+content: |
+  - 外部APIの呼び出しやウェブ参照はしない。
+  - 数値は根拠がない場合は概算と明示。
