@@ -1,40 +1,42 @@
-import { strict as assert } from 'node:assert'
 import test from 'node:test'
-import { composePromptWithSelection, formatSelectionSummary } from './App'
+import assert from 'node:assert/strict'
 
-const baseParams: Record<string, unknown> = { goal: '', tone: '', steps: 1, user_input: '' }
-const makeInvoke = (calls: Array<{ cmd: string; args?: Record<string, unknown> }>) =>
-  async (cmd: string, args?: Record<string, unknown>) => {
-    calls.push({ cmd, args })
-    if (cmd === 'compose_prompt') return { final_prompt: '', sha256: 'hash', model: 'llama3:8b' }
-    return ''
-  }
+import { createDiffPreviewFlow } from './App'
 
-test('選択送信を有効化すると選択部分のみが compose_prompt に渡され概算文字数が表示される', async () => {
-  const calls: Array<{ cmd: string; args?: Record<string, unknown> }> = []
-  await composePromptWithSelection({
-    invokeFn: makeInvoke(calls),
-    params: { ...baseParams },
-    recipePath: 'recipe.yaml',
-    leftText: '左ペイン全体のテキスト',
-    sendSelectionOnly: true,
-    selection: '選択のみ'
+test('diff preview requires approval before applying', () => {
+  let left = 'line1\nleft'
+  const right = 'line1\nright'
+  const patches: string[] = []
+  let open = false
+
+  const flow = createDiffPreviewFlow({
+    readLeft: () => left,
+    readRight: () => right,
+    show: patch => {
+      open = true
+      patches.push(patch)
+    },
+    apply: next => {
+      left = next
+    },
+    close: () => {
+      open = false
+    }
   })
-  assert.equal(calls[0]!.cmd, 'compose_prompt')
-  assert.equal(((calls[0]!.args as any).inlineParams as any).user_input, '選択のみ')
-  assert.equal(formatSelectionSummary(true, 'abc', 'abcdef'), '送信文字数: 約3字')
-})
 
-test('選択が空の場合は全文送信にフォールバックし概算文字数も全文に一致する', async () => {
-  const calls: Array<{ cmd: string; args?: Record<string, unknown> }> = []
-  await composePromptWithSelection({
-    invokeFn: makeInvoke(calls),
-    params: { ...baseParams },
-    recipePath: 'recipe.yaml',
-    leftText: 'abcdef',
-    sendSelectionOnly: true,
-    selection: ''
-  })
-  assert.equal(((calls[0]!.args as any).inlineParams as any).user_input, 'abcdef')
-  assert.equal(formatSelectionSummary(true, '', 'abcdef'), '送信文字数: 約6字')
+  flow.open()
+  assert.equal(open, true)
+  assert.equal(patches.length, 1)
+  assert.ok(patches[0].includes('-left') && patches[0].includes('+right'))
+  assert.equal(left, 'line1\nleft')
+
+  flow.cancel()
+  assert.equal(open, false)
+  assert.equal(left, 'line1\nleft')
+
+  flow.open()
+  flow.confirm()
+  assert.equal(open, false)
+  assert.equal(left, right)
+  assert.equal(patches.length, 2)
 })
