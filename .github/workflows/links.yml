@@ -1,0 +1,21 @@
+﻿name: links
+on:
+  pull_request:
+  schedule: [{ cron: "0 3 * * 1" }]
+permissions: { contents: read, issues: write }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lycheeverse/lychee-action@v2
+        # lychee v0.20.x 莉･髯阪〒縺ｯ --exclude-mail 縺悟ｻ・ｭ｢縺輔ｌ縺ｦ縺翫ｊ縲∵里螳壹〒繝｡繝ｼ繝ｫ繝ｪ繝ｳ繧ｯ繧帝勁螟悶☆繧・
+        with:
+          args: >-
+            --verbose --no-progress
+            --max-redirects 5
+            --timeout 20
+            **/*.md
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+

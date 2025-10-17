@@ -1,0 +1,73 @@
+﻿name: Require PR labels
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
+      - unlabeled
+      - edited
+
+jobs:
+  check-labels:
+    permissions:
+      issues: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: "讀懆ｨｼ: type:* 縺ｨ semver:* 繝ｩ繝吶Ν縺ｮ莉倅ｸ・
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const requiredPrefixes = ["type:", "semver:"];
+            const defaultLabelsByPrefix = {
+              "type:": "type:chore",
+              "semver:": "semver:patch",
+            };
+
+            const labels = context.payload.pull_request?.labels?.map((label) => label.name) ?? [];
+            const missing = requiredPrefixes.filter((prefix) => !labels.some((name) => name.startsWith(prefix)));
+
+            if (missing.length === 0) {
+              core.info("蠢・ｦ√↑繝ｩ繝吶Ν縺後☆縺ｹ縺ｦ莉倅ｸ弱＆繧後※縺・∪縺・);
+              return;
+            }
+
+            const autoLabels = missing
+              .map((prefix) => defaultLabelsByPrefix[prefix])
+              .filter((label) => Boolean(label) && !labels.includes(label));
+
+            if (autoLabels.length > 0) {
+              const isSameRepository =
+                context.payload.pull_request?.head?.repo?.full_name ===
+                context.payload.pull_request?.base?.repo?.full_name;
+
+              if (isSameRepository) {
+                try {
+                  await github.rest.issues.addLabels({
+                    ...context.repo,
+                    issue_number: context.payload.pull_request.number,
+                    labels: autoLabels,
+                  });
+                  core.info(`荳崎ｶｳ繝ｩ繝吶Ν繧定・蜍穂ｻ倅ｸ弱＠縺ｾ縺励◆: ${autoLabels.join(", ")}`);
+                  return;
+                } catch (error) {
+                  if (error?.status === 403) {
+                    core.warning("GITHUB_TOKEN 縺ｫ繝ｩ繝吶Ν莉倅ｸ取ｨｩ髯舌′縺ｪ縺・◆繧∬・蜍穂ｻ倅ｸ弱ｒ繧ｹ繧ｭ繝・・縺励∪縺・);
+                  } else {
+                    throw error;
+                  }
+                }
+              } else {
+                core.info("繝輔か繝ｼ繧ｯ逕ｱ譚･縺ｮPR縺ｮ縺溘ａ閾ｪ蜍穂ｻ倅ｸ弱ｒ繧ｹ繧ｭ繝・・縺励∪縺・);
+              }
+            }
+
+            const message = `縺薙・PR縺ｫ縺ｯ莉･荳九・繝ｩ繝吶Ν繧剃ｻ倅ｸ弱＠縺ｦ縺上□縺輔＞: ${missing.join(", ")}`;
+            core.error(message);
+            core.setFailed(message);
+
+

@@ -1,0 +1,163 @@
+﻿name: spec-tasker
+on:
+  pull_request:
+    types: [opened, synchronize, edited, reopened, labeled]
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  tasker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Load config (optional)
+        id: cfg
+        shell: bash
+        run: |
+          CONF=".github/spec-tasker.json"
+          if [ -f "$CONF" ]; then
+            echo "conf_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "conf_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Detect files
+        id: detect
+        shell: bash
+        run: |
+          has() { for f in "$@"; do [ -f "$f" ] && return 0; done; return 1; }
+
+          REQ=("REQUIREMENTS.md" "docs/requirements.md")
+          SPEC=("SPEC.md" "docs/spec.md")
+          DES=("DESIGN.md" "docs/design.md")
+
+          if [ "${{ steps.cfg.outputs.conf_exists }}" = "true" ]; then
+            mapfile -t REQ < <(jq -r '.requirements[]?' .github/spec-tasker.json)
+            mapfile -t SPEC < <(jq -r '.spec[]?'         .github/spec-tasker.json)
+            mapfile -t DES < <(jq -r '.design[]?'        .github/spec-tasker.json)
+          fi
+
+          has "${REQ[@]}";  echo "has_req=$?"  >> "$GITHUB_OUTPUT"
+          has "${SPEC[@]}"; echo "has_spec=$?" >> "$GITHUB_OUTPUT"
+          has "${DES[@]}";  echo "has_des=$?"  >> "$GITHUB_OUTPUT"
+
+          AUTO="false"
+          echo "${{ toJson(github.event.pull_request.labels) }}" | jq -r '.[].name' | grep -q '^auto-task$' && AUTO="true"
+          if [ "${{ steps.cfg.outputs.conf_exists }}" = "true" ] && jq -e '.auto_task_by_default==true' .github/spec-tasker.json >/dev/null 2>&1; then
+            AUTO="true"
+          fi
+          echo "auto_task=$AUTO" >> "$GITHUB_OUTPUT"
+
+      - name: Label PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const core = require('@actions/core');
+            const add = async (labels) => github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels,
+            });
+            const hasReq = core.getInput('has_req') === '0';
+            const hasSpec = core.getInput('has_spec') === '0';
+            const hasDes = core.getInput('has_des') === '0';
+            if (hasReq && !hasSpec) {
+              await add(['needs-spec']);
+            } else if (hasSpec && !hasDes) {
+              await add(['needs-design']);
+            } else if (hasReq && hasSpec && hasDes) {
+              await add(['needs-e2e-review']);
+            }
+          has_req: ${{ steps.detect.outputs.has_req }}
+          has_spec: ${{ steps.detect.outputs.has_spec }}
+          has_des: ${{ steps.detect.outputs.has_des }}
+
+      - name: Sticky summary comment (no spam)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const core = require('@actions/core');
+            const hasReq = core.getInput('has_req') === '0';
+            const hasSpec = core.getInput('has_spec') === '0';
+            const hasDes = core.getInput('has_des') === '0';
+            const badge = (state) => (state ? '笨・ : '笶・);
+            const body = [
+              '<!-- spec-tasker-sticky -->',
+              '**Spec Matrix**  ',
+              `REQUIREMENTS ${badge(hasReq)} / SPEC ${badge(hasSpec)} / DESIGN ${badge(hasDes)}`,
+              '',
+              '- 荳崎ｶｳ縺後≠繧後・繝ｩ繝吶Ν繧剃ｻ倅ｸ弱＠縺ｾ縺呻ｼ磯撼繝悶Ο繝・く繝ｳ繧ｰ・峨・,
+              '- Issue閾ｪ蜍戊ｵｷ逾ｨ縺ｯ **label: \`auto-task\`** 莉倥″PR縺ｮ縺ｿ縲・,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const mine = comments.find((c) => c.user?.type === 'Bot' && c.body?.includes('<!-- spec-tasker-sticky -->'));
+            if (mine) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: mine.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+          has_req: ${{ steps.detect.outputs.has_req }}
+          has_spec: ${{ steps.detect.outputs.has_spec }}
+          has_des: ${{ steps.detect.outputs.has_des }}
+
+      - name: Create issues (only when auto-task)
+        if: ${{ steps.detect.outputs.auto_task == 'true' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const core = require('@actions/core');
+            const pr = context.payload.pull_request;
+            const hasReq = core.getInput('has_req') === '0';
+            const hasSpec = core.getInput('has_spec') === '0';
+            const hasDes = core.getInput('has_des') === '0';
+            const mk = (title, body, labels = ['task', 'docs', 'spec-tasker']) => ({
+              title,
+              body,
+              labels,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const tasks = [];
+            if (hasReq && !hasSpec) {
+              tasks.push(mk(`TASK: Create SPEC for PR #${pr.number}`,
+                `**逶ｮ逧・*: 隕∽ｻｶ縺ｯ縺ゅｋ縺御ｻ墓ｧ倥′譛ｪ謨ｴ蛯吶よ怙蟆輯PEC繧剃ｽ懈・縲・n\n- 蜿り・ \`docs/spec.template.md\`\n- 髢｢騾｣PR: #${pr.number}`));
+            } else if (hasSpec && !hasDes) {
+              tasks.push(mk(`TASK: Create DESIGN for PR #${pr.number}`,
+                `**逶ｮ逧・*: 莉墓ｧ倥・縺ゅｋ縺瑚ｨｭ險医′譛ｪ謨ｴ蛯吶よ怙蟆愁ESIGN繧剃ｽ懈・縲・n\n- 蜿り・ \`docs/design.template.md\`\n- 髢｢騾｣PR: #${pr.number}`));
+            } else if (hasReq && hasSpec && hasDes) {
+              tasks.push(mk(`TASK: E2E Review for PR #${pr.number}`,
+                `**逶ｮ逧・*: 隕∽ｻｶ/莉墓ｧ・險ｭ險医・謨ｴ蜷域ｧ繧堤｢ｺ隱阪ゅメ繧ｧ繝・け繝ｪ繧ｹ繝医ｒ蝓九ａ縺ｦ螳御ｺ・・n\n- [ ] 隕∽ｻｶ竊剃ｻ墓ｧ・霑ｽ霍｡諤ｧ\n- [ ] 莉墓ｧ倪・險ｭ險・霑ｽ霍｡諤ｧ\n- [ ] 蜿怜・諠ｳ螳壹・謇句虚蜀咲樟繝｡繝｢\n- [ ] 髱樊ｩ溯・縺ｮ繝｡繝｢・域ｧ閭ｽ/驕狗畑/繧ｻ繧ｭ繝･繝ｪ繝・ぅ・噂n\n- 髢｢騾｣PR: #${pr.number}`));
+            }
+            for (const t of tasks) {
+              const q = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open in:title "${t.title}"`;
+              const existing = await github.rest.search.issuesAndPullRequests({ q });
+              if (!existing.data.items.length) {
+                await github.rest.issues.create(t);
+              }
+            }
+          has_req: ${{ steps.detect.outputs.has_req }}
+          has_spec: ${{ steps.detect.outputs.has_spec }}
+          has_des: ${{ steps.detect.outputs.has_des }}
+
