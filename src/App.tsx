@@ -30,6 +30,8 @@ export default function App() {
   // パラメータ
   const [params, setParams] = useState({ goal: '30秒の戦闘シーン', tone: '冷静', steps: 6, user_input: '' })
   const [composed, setComposed] = useState<ComposeResult | null>(null)
+  const [focusSide, setFocusSide] = useState<'both' | 'left' | 'right'>('both')
+  const focusOrder = useRef<'left' | 'right'>('left')
 
   // 実行ボタン演出
   const [running, setRunning] = useState(false)
@@ -174,6 +176,33 @@ export default function App() {
     }
   }, [])
 
+  const pickInitialFocus = useCallback((): 'left' | 'right' => {
+    const active = document.activeElement as HTMLElement | null
+    const side = active?.getAttribute('data-side')
+    if (side === 'left' || side === 'right') {
+      focusOrder.current = side === 'left' ? 'right' : 'left'
+      return side
+    }
+    const next = focusOrder.current
+    focusOrder.current = next === 'left' ? 'right' : 'left'
+    return next
+  }, [])
+
+  const toggleFocus = useCallback((mode: 'button' | 'hotkey' = 'button') => {
+    setFocusSide(prev => {
+      if (prev === 'both') {
+        return pickInitialFocus()
+      }
+      if (mode === 'button') {
+        focusOrder.current = prev === 'left' ? 'right' : 'left'
+        return 'both'
+      }
+      const next = prev === 'left' ? 'right' : 'left'
+      focusOrder.current = next === 'left' ? 'right' : 'left'
+      return next
+    })
+  }, [pickInitialFocus])
+
   // ショートカット
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -187,10 +216,14 @@ export default function App() {
         e.preventDefault()
         copy(rightText)
       }
+      if (mod && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        toggleFocus('hotkey')
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [runOllama, copy, saveLeftToProject, rightText])
+  }, [runOllama, copy, saveLeftToProject, rightText, toggleFocus])
 
   return (
     <div style={{ padding: 16 }}>
@@ -229,6 +262,9 @@ export default function App() {
         </div>
 
         <div className="right-actions">
+          <button className="btn" onClick={() => toggleFocus()}>
+            {focusSide === 'both' ? 'フォーカス切替（Ctrl/Cmd+Shift+F）' : 'フォーカス解除'}
+          </button>
           {composed && <div className="badge">SHA-256: {composed.sha256.slice(0,16)}…</div>}
           <button ref={runBtnRef} className={`btn primary runpulse ${running ? 'active' : ''}`} onClick={runOllama} disabled={running}>
             ▶ 実行（Ctrl/Cmd+Enter）
@@ -239,7 +275,7 @@ export default function App() {
       {/* 分割ビュー */}
       <div className="split">
         {/* 左：入力 */}
-        <div className="panel">
+        <div className="panel" style={{ display: focusSide === 'right' ? 'none' : undefined }}>
           <h3>
             <span>入力</span>
             <span className="toolbar">
@@ -248,12 +284,12 @@ export default function App() {
             </span>
           </h3>
           <div className="area">
-            <textarea data-side="left" value={leftText} onChange={e => setLeftText(e.target.value)} />
+            <textarea data-side="left" data-testid="left-editor" value={leftText} onChange={e => setLeftText(e.target.value)} />
           </div>
         </div>
 
         {/* 右：LLM整形出力 */}
-        <div className="panel">
+        <div className="panel" style={{ display: focusSide === 'left' ? 'none' : undefined }}>
           <h3>
             <span>LLM（整形出力）</span>
             <span className="toolbar">
@@ -263,7 +299,7 @@ export default function App() {
             </span>
           </h3>
           <div className="area">
-            <textarea data-side="right" value={rightText} onChange={e => setRightText(e.target.value)} />
+            <textarea data-side="right" data-testid="right-editor" value={rightText} onChange={e => setRightText(e.target.value)} />
           </div>
         </div>
       </div>
