@@ -1,11 +1,40 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { writeText } from '@tauri-apps/api/clipboard'
 import { save } from '@tauri-apps/api/dialog'
 import { writeTextFile } from '@tauri-apps/api/fs'
 import './app.css'
 
-type ComposeResult = { final_prompt: string; sha256: string; model: string }
+export type ComposeResult = { final_prompt: string; sha256: string; model: string }
+type InvokeFunction = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
+
+export const determineUserInput = (sendSelectionOnly: boolean, selection: string, leftText: string): string =>
+  sendSelectionOnly && selection ? selection : leftText
+
+export const composePromptWithSelection = async (
+  {
+    invokeFn = invoke,
+    params,
+    recipePath,
+    leftText,
+    sendSelectionOnly,
+    selection
+  }: {
+    invokeFn?: InvokeFunction
+    params: Record<string, unknown>
+    recipePath: string
+    leftText: string
+    sendSelectionOnly: boolean
+    selection: string
+  }
+): Promise<ComposeResult> => {
+  const userInput = determineUserInput(sendSelectionOnly, selection, leftText)
+  const res = await invokeFn('compose_prompt', { recipePath, inlineParams: { ...params, user_input: userInput } })
+  return res as ComposeResult
+}
+
+export const formatSelectionSummary = (sendSelectionOnly: boolean, selection: string, leftText: string): string =>
+  `送信文字数: 約${determineUserInput(sendSelectionOnly, selection, leftText).length}字`
 
 type Workspace = {
   version: number
@@ -17,6 +46,36 @@ type Workspace = {
   updated_at: string
   project_path?: string
 }
+
+type DiffPreviewCallbacks = {
+  show(patch: string): void
+  apply(next: string): void
+  close(): void
+  readLeft(): string
+  readRight(): string
+}
+
+export const buildUnifiedDiff = (before: string, after: string): string => {
+  const header = '--- 左\n+++ 右\n@@'
+  if (before === after) return `${header}\n  (差分はありません)`
+  const beforeLines = before.split('\n')
+  const afterLines = after.split('\n')
+  const body = Array.from({ length: Math.max(beforeLines.length, afterLines.length) }, (_, idx) => {
+    const left = beforeLines[idx]
+    const right = afterLines[idx]
+    if (left === right) return ` ${left ?? ''}`
+    const minus = left !== undefined ? `-${left}` : ''
+    const plus = right !== undefined ? `+${right}` : ''
+    return [minus, plus].filter(Boolean).join('\n')
+  }).join('\n')
+  return `${header}\n${body}`
+}
+
+export const createDiffPreviewFlow = (callbacks: DiffPreviewCallbacks) => ({
+  open: () => callbacks.show(buildUnifiedDiff(callbacks.readLeft(), callbacks.readRight())),
+  confirm: () => (callbacks.apply(callbacks.readRight()), callbacks.close()),
+  cancel: () => callbacks.close()
+})
 
 export default function App() {
   // 左右ペインのテキスト状態
@@ -30,10 +89,14 @@ export default function App() {
   // パラメータ
   const [params, setParams] = useState({ goal: '30秒の戦闘シーン', tone: '冷静', steps: 6, user_input: '' })
   const [composed, setComposed] = useState<ComposeResult | null>(null)
+  const [diffPatch, setDiffPatch] = useState<string | null>(null)
 
   // 実行ボタン演出
   const [running, setRunning] = useState(false)
   const runBtnRef = useRef<HTMLButtonElement>(null)
+  const leftTextRef = useRef<HTMLTextAreaElement>(null)
+  const [sendSelectionOnly, setSendSelectionOnly] = useState<boolean>(false)
+  const [leftSelection, setLeftSelection] = useState<string>('')
 
   // プロジェクトファイルパス（project/ 内相対）
   const [projRel, setProjRel] = useState('src/example.py')
@@ -92,11 +155,16 @@ export default function App() {
 
   // 合成
   const doCompose = useCallback(async () => {
-    const merged = { ...params, user_input: leftText }
-    const res = await invoke<ComposeResult>('compose_prompt', { recipePath, inlineParams: merged })
+    const res = await composePromptWithSelection({
+      params,
+      recipePath,
+      leftText,
+      sendSelectionOnly,
+      selection: leftSelection
+    })
     setComposed(res)
     return res
-  }, [params, leftText, recipePath])
+  }, [params, recipePath, leftText, sendSelectionOnly, leftSelection])
 
   // 実行（▶）
   const runOllama = useCallback(async () => {
@@ -109,20 +177,31 @@ export default function App() {
       const sys = at < 0 ? c.final_prompt : c.final_prompt.slice(0, at)
       const user = at < 0 ? '' : c.final_prompt.slice(at)
 
-      const res = await invoke<string>('run_ollama_chat', {
+      const res = await invoke('run_ollama_chat', {
         model: ollamaModel,
         systemText: sys,
         userText: user
       })
-      setRightText(res)
+      setRightText(res as string)
     } finally {
       setTimeout(() => runBtnRef.current?.classList.remove('active'), 120)
       setRunning(false)
     }
   }, [composed, doCompose, ollamaModel])
 
-  // 右→左 反映
-  const reflectRightToLeft = useCallback(() => setLeftText(rightText), [rightText])
+  // 右→左 反映（プレビュー付き）
+  const diffFlow = useMemo(() => createDiffPreviewFlow({ readLeft: () => leftText, readRight: () => rightText, show: value => setDiffPatch(value), apply: value => setLeftText(value), close: () => setDiffPatch(null) }), [leftText, rightText])
+  const { open: openDiffPreview, confirm: confirmDiffPreview, cancel: cancelDiffPreview } = diffFlow
+
+  const handleLeftSelection = useCallback((target: HTMLTextAreaElement) => {
+    const { selectionStart, selectionEnd, value } = target
+    setLeftSelection(selectionStart === selectionEnd ? '' : value.slice(selectionStart, selectionEnd))
+  }, [])
+
+  const handleLeftChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setLeftText(e.target.value)
+    handleLeftSelection(e.currentTarget)
+  }, [handleLeftSelection])
 
   // --- Project file helpers ---
   const openProjectToLeft = useCallback(async () => {
@@ -229,6 +308,11 @@ export default function App() {
         </div>
 
         <div className="right-actions">
+          <label className="toolbar" style={{ gap: 6, alignItems: 'center' }}>
+            <input type="checkbox" checked={sendSelectionOnly} onChange={e => setSendSelectionOnly(e.target.checked)} />
+            <span>選択のみ送る</span>
+            <span className="badge">{formatSelectionSummary(sendSelectionOnly, leftSelection, leftText)}</span>
+          </label>
           {composed && <div className="badge">SHA-256: {composed.sha256.slice(0,16)}…</div>}
           <button ref={runBtnRef} className={`btn primary runpulse ${running ? 'active' : ''}`} onClick={runOllama} disabled={running}>
             ▶ 実行（Ctrl/Cmd+Enter）
@@ -248,7 +332,7 @@ export default function App() {
             </span>
           </h3>
           <div className="area">
-            <textarea data-side="left" value={leftText} onChange={e => setLeftText(e.target.value)} />
+            <textarea data-side="left" ref={leftTextRef} value={leftText} onSelect={e => handleLeftSelection(e.currentTarget)} onChange={handleLeftChange} />
           </div>
         </div>
 
@@ -257,7 +341,7 @@ export default function App() {
           <h3>
             <span>LLM（整形出力）</span>
             <span className="toolbar">
-              <button className="btn" onClick={() => setLeftText(rightText)}>⇧ 反映</button>
+              <button className="btn" onClick={openDiffPreview}>⇧ 反映</button>
               <button className="btn" onClick={() => writeText(rightText)}>コピー</button>
               <button className="btn" onClick={() => saveAs('right.txt', rightText)}>別名保存</button>
             </span>
@@ -267,6 +351,19 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {diffPatch && (
+        <div className="diff-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="diff-modal" style={{ background: '#fff', color: '#222', padding: 24, width: 'min(720px, 90vw)', maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.25)' }}>
+            <h3 style={{ margin: 0 }}>差分プレビュー</h3>
+            <pre data-testid="diff-preview" style={{ margin: 0, padding: 12, background: '#111', color: '#0f0', overflow: 'auto', fontSize: 12, lineHeight: 1.5 }}>{diffPatch}</pre>
+            <div className="toolbar" style={{ justifyContent: 'flex-end', gap: 12 }}>
+              <button className="btn primary" onClick={confirmDiffPreview}>承認</button>
+              <button className="btn" onClick={cancelDiffPreview}>キャンセル</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
