@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { invoke } from '@tauri-apps/api/tauri'
-import { appWindow } from '@tauri-apps/api/window'
+import { invoke } from '@tauri-apps/api/core'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
 type UnlistenFn = () => void | Promise<void>
 
@@ -42,7 +42,9 @@ export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
     streamingRef.current = true
     setIsStreaming(true)
     const unlisteners: UnlistenFn[] = []
-    const register = async (name: string, cb: (event: unknown) => void) => unlisteners.push(await appWindow.listen(name, cb as (event: unknown) => void))
+    const window = getCurrentWindow()
+    const register = async (name: string, cb: (event: unknown) => void) =>
+      unlisteners.push(await window.listen(name, cb as (event: unknown) => void))
     await register('ollama:chunk', (event: { payload: string }) => appendChunk(event.payload))
     await register('ollama:end', () => finalize('end'))
     await register('ollama:error', event => finalize('error', (event as { payload?: unknown }).payload))
@@ -72,7 +74,8 @@ if (import.meta.vitest) {
   const React = await import('react')
   const { act } = await import('react-dom/test-utils')
   const { createRoot } = await import('react-dom/client')
-  const tauriModule = await import('@tauri-apps/api/tauri')
+  const tauriModule = await import('@tauri-apps/api/core')
+  const windowModule = await import('@tauri-apps/api/window')
 
   type HandlerPayload = { payload?: unknown }
 
@@ -99,10 +102,14 @@ if (import.meta.vitest) {
       resolveRun = null
       rejectRun = null
       runOverride = null
-      vi.spyOn(appWindow, 'listen').mockImplementation(async (event: string, handler: (payload: HandlerPayload) => void) => {
-        listeners[event] = handler
-        return () => { delete listeners[event] }
-      })
+      vi.spyOn(windowModule, 'getCurrentWindow').mockReturnValue({
+        listen: vi.fn(async (event: string, handler: (payload: HandlerPayload) => void) => {
+          listeners[event] = handler
+          return () => {
+            delete listeners[event]
+          }
+        })
+      } as unknown as ReturnType<typeof windowModule.getCurrentWindow>)
       vi.spyOn(tauriModule, 'invoke').mockImplementation(async (cmd: string) => {
         if (cmd === 'run_ollama_stream') {
           if (runOverride) return await runOverride()
