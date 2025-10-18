@@ -12,13 +12,16 @@ next_review_due: 2025-11-14
 
 - 必須要件（フォーマット・件数・整合性など）
 - PR本文に Priority Score（値と根拠）が記録されていること。
-- PR本文には整形スクリプト（例: `scripts/format.sh`）の最新実行ログを添付し、PRテンプレート（[.github/pull_request_template.md](../../.github/pull_request_template.md)）の指針に従うこと（決定: [IN-20250310-001](../../docs/IN-20250310-001.md)）。
+- PR本文は PRテンプレート（[.github/pull_request_template.md](../../.github/pull_request_template.md)）の指針に従うこと。
+- 整形スクリプト（例: `scripts/format.sh`）の最新実行ログを PR本文へ添付し、提出前に整形が走ったことを証明すること。[^in-20250310-001]
 - governance/policy.yaml の forbidden_paths を変更しないこと。
 - インシデント発生時は
   [`docs/INCIDENT_TEMPLATE.md`](../../docs/INCIDENT_TEMPLATE.md) に沿って作成し、
   最新例（[IN-20250310-001](../../docs/IN-20250310-001.md)／
   [IN-20250215-001](../../docs/IN-20250215-001.md)）が該当PRおよび RUNBOOK から
   相互リンクされていること
+
+[^in-20250310-001]: 整形スクリプト実行ログ添付を必須とする合意背景。詳細は [IN-20250310-001](../../docs/IN-20250310-001.md) を参照。
 
 ## KPIs
 
