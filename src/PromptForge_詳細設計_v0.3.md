@@ -1,10 +1,13 @@
 # PromptForge 詳細設計（v0.3 / MVP）
+
 **日付**: 2025-10-18（Asia/Tokyo）
 
 ---
 
 ## 1. フロントエンド詳細
+
 ### 1.1 コンポーネントツリー
+
 ```text
 App
 ├─ FileBar
@@ -16,11 +19,13 @@ App
 ```
 
 ### 1.2 状態管理
+
 - `useState` ベース（小規模前提）。将来は **Zustand**/Contextへ移行可能。
 - `Workspace` は変更イベントを800msデバウンスして `write_workspace`。  
 - ホットキー：`keydown` でグローバル捕捉（衝突防止に `preventDefault`）。
 
 ### 1.3 主要UI仕様
+
 - **FileBar**
   - 入力：`projRel`（`project/`相対）
   - 操作：`.py一覧` / `←左開く` / `→右開く` / `左保存` / `右保存`
@@ -31,7 +36,9 @@ App
   - 右→左の**⇧反映**ボタン
 
 ## 2. ブリッジ（Tauri/Rust）詳細
+
 ### 2.1 コマンドI/F
+
 ```rust
 #[tauri::command]
 fn compose_prompt(
