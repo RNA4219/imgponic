@@ -439,10 +439,10 @@ fn list_prompt_files(kind: String) -> Result<Vec<PromptFileEntry>, String> {
 fn read_prompt_file(rel_path: String) -> Result<FileContent, String> {
     let base = PathBuf::from("prompts");
     let path = base.join(&rel_path);
+    ensure_under(&base, &path).map_err(|e| e.to_string())?;
     if !path.exists() {
         return Err("file not found".into());
     }
-    ensure_under(&base, &path).map_err(|e| e.to_string())?;
     let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     Ok(FileContent {
         path: path.display().to_string(),
