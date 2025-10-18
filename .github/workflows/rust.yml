@@ -1,0 +1,87 @@
+name: rust
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  schedule:
+    - cron: '0 3 * * 1'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TZ: UTC
+  LANG: C.UTF-8
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir -p workflow-cookbook/logs
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Run cargo suite
+        run: |
+          set -Euo pipefail
+          overall=0
+          log() {
+            echo "{\"name\":\"$1\",\"status\":\"$2\",\"duration_ms\":$3}" >> workflow-cookbook/logs/test.jsonl
+          }
+          run_check() {
+            local name="$1"
+            shift
+            local start=$(date +%s%3N)
+            if "$@"; then
+              log "$name" pass $(( $(date +%s%3N)-start ))
+            else
+              log "$name" fail $(( $(date +%s%3N)-start ))
+              overall=1
+            fi
+          }
+          run_check rust::fmt cargo fmt --all -- --check
+          run_check rust::clippy cargo clippy --all-targets --all-features -D warnings
+          run_check rust::test cargo test --all-features --workspace
+          run_check rust::build cargo build --release --workspace
+          run_check rust::doc cargo doc --no-deps -D warnings --workspace
+          if ! cargo install cargo-audit >/dev/null 2>&1; then true; fi
+          start=$(date +%s%3N)
+          if cargo audit -q; then
+            log rust::audit pass $(( $(date +%s%3N)-start ))
+          else
+            log rust::audit fail $(( $(date +%s%3N)-start ))
+            if [ "${CI_STRICT:-}" = "true" ]; then overall=1; fi
+          fi
+          exit $overall
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-logs
+          path: workflow-cookbook/logs/*
+
+  msrv:
+    if: ${{ vars.ENABLE_MSRV == 'true' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir -p workflow-cookbook/logs
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ vars.RUST_MSRV || '1.70.0' }}
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo check (msrv)
+        run: |
+          set -Eeuo pipefail
+          start=$(date +%s%3N)
+          if cargo check --workspace; then s=pass; else s=fail; fi
+          echo "{\"name\":\"rust::msrv\",\"status\":\"$s\",\"duration_ms\":$(( $(date +%s%3N)-start ))}" >> workflow-cookbook/logs/test.jsonl
+          if [ "$s" = fail ]; then exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-logs
+          path: workflow-cookbook/logs/*
