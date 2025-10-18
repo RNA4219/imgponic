@@ -26,3 +26,7 @@ tauri-build = { version = "2", features = [] }
 [dev-dependencies]
 insta = "1"
 tempfile = "3"
+
+[patch.crates-io]
+proc-macro-error = { path = "third_party/proc-macro-error" }
+proc-macro-error-attr = { path = "third_party/proc-macro-error-attr" }

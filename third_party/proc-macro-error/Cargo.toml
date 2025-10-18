@@ -1,0 +1,35 @@
+[package]
+name = "proc-macro-error"
+version = "1.0.5"
+edition = "2018"
+license = "MIT OR Apache-2.0"
+authors = ["PromptForge Maintainers <opensource@promptforge.example>"]
+description = "Maintained fork of proc-macro-error for PromptForge"
+repository = "https://github.com/promptforge/imgponic"
+readme = "README.md"
+keywords = ["proc-macro", "error", "errors"]
+categories = ["development-tools::procedural-macro-helpers"]
+build = "build.rs"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[features]
+default = ["syn-error"]
+syn-error = ["syn"]
+
+[dependencies]
+proc-macro-error-attr = { version = "=1.0.5", path = "../proc-macro-error-attr" }
+proc-macro2 = "1"
+quote = "1"
+
+[dependencies.syn]
+version = "1"
+default-features = false
+optional = true
+
+[build-dependencies]
+version_check = "0.9"
+
+[dev-dependencies]
+trybuild = { version = "1.0.19", features = ["diff"] }
