@@ -60,7 +60,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: 'test-logs-${{ github.job }}'
           path: workflow-cookbook/logs/*
 
   msrv:
@@ -83,5 +83,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: 'test-logs-${{ github.job }}'
           path: workflow-cookbook/logs/*
