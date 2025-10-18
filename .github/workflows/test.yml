@@ -321,6 +321,7 @@ jobs:
         with:
           pattern: test-logs-*
           path: logs
+          merge-multiple: true
       - name: Summarize & STRICT gate (optional)
         run: |
           set -Eeuo pipefail
