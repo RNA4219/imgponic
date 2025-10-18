@@ -359,6 +359,73 @@ fn ensure_under(base: &Path, target: &Path) -> Result<(), io::Error> {
     }
 }
 
+// ---------- Prompt files ----------
+const PROMPT_ALLOWED_KINDS: &[&str] = &["system", "task", "style", "constraints"];
+
+#[derive(Debug, Serialize)]
+struct PromptFileEntry {
+    path: String,
+    name: String,
+}
+
+#[tauri::command]
+fn list_prompt_files(kind: String) -> Result<Vec<PromptFileEntry>, String> {
+    use walkdir::WalkDir;
+
+    let kind = kind.to_lowercase();
+    if !PROMPT_ALLOWED_KINDS.iter().any(|allowed| allowed == &kind) {
+        return Err("unsupported prompt kind".into());
+    }
+
+    let base = PathBuf::from("prompts");
+    let dir = base.join(&kind);
+    if !dir.exists() {
+        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    }
+
+    let mut entries = vec![];
+    for entry in WalkDir::new(&dir).into_iter().filter_map(|e| e.ok()) {
+        if entry.file_type().is_file() {
+            let path = entry.path();
+            ensure_under(&base, path).map_err(|e| e.to_string())?;
+            let rel = path
+                .strip_prefix(&base)
+                .unwrap()
+                .to_string_lossy()
+                .to_string();
+            let name = path.file_name().unwrap().to_string_lossy().to_string();
+            entries.push(PromptFileEntry { path: rel, name });
+        }
+    }
+
+    entries.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(entries)
+}
+
+#[derive(Debug, Serialize)]
+struct PromptFileContent {
+    path: String,
+    content: String,
+}
+
+#[tauri::command]
+fn read_prompt_file(rel_path: String) -> Result<PromptFileContent, String> {
+    let base = PathBuf::from("prompts");
+    if !base.exists() {
+        fs::create_dir_all(&base).map_err(|e| e.to_string())?;
+    }
+    let p = base.join(&rel_path);
+    ensure_under(&base, &p).map_err(|e| e.to_string())?;
+    if !p.exists() {
+        return Err("file not found".into());
+    }
+    let content = fs::read_to_string(&p).map_err(|e| e.to_string())?;
+    Ok(PromptFileContent {
+        path: p.display().to_string(),
+        content,
+    })
+}
+
 // ---------- Project file I/O ----------
 const PROJECT_ALLOWED_EXTS: &[&str] = &["py", "txt", "md", "json"];
 
@@ -486,6 +553,11 @@ pub mod project_test_support {
     pub use super::{read_project_file, write_project_file, FileContent};
 }
 
+#[cfg(test)]
+pub mod prompt_test_support {
+    pub use super::{list_prompt_files, read_prompt_file, PromptFileContent, PromptFileEntry};
+}
+
 fn workspace_path(app: &tauri::AppHandle) -> PathBuf {
     if let Some(mut p) = app.path_resolver().app_data_dir() {
         p.push("workspace.json");
@@ -543,6 +615,8 @@ fn main() {
             run_ollama_stream,
             abort_current_stream,
             save_run,
+            list_prompt_files,
+            read_prompt_file,
             list_project_files,
             read_project_file,
             write_project_file,
