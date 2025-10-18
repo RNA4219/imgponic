@@ -38,9 +38,9 @@ Imgponic は、**プロンプトとコードを“育てる”ためのローカ
 ### 1) Ollamaを起動（モデル準備）
 
 ```powershell
-# 例：Llama 3 8B
+## 例：Llama 3 8B
 ollama pull llama3:8b
-# サービスが http://localhost:11434 で応答する状態に
+## サービスが http://localhost:11434 で応答する状態に
 ```
 
 ### 2) リリースを取得
