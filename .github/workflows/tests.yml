@@ -29,6 +29,9 @@ jobs:
       - name: Run Vitest suite
         run: npm run test
 
+      - name: Run node:test suite
+        run: npm run test:node
+
       - name: Install Rust components
         run: |
           rustup component add clippy rustfmt
