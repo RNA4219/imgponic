@@ -2,6 +2,9 @@
 
 mod ollama_stream;
 
+#[cfg(test)]
+mod tests;
+
 use anyhow::{Context, Result};
 use chrono::Local;
 use futures_util::StreamExt;
