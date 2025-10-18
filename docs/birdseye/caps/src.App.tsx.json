@@ -1,0 +1,27 @@
+{
+  "id": "src/App.tsx",
+  "role": "ui-shell",
+  "summary": "Imgponic のメインUI。Ollama接続チェック、ストリーム制御、プロジェクトファイル操作を統括し、選択テキスト整形とTauriコマンド呼び出しを仲介する。",
+  "public_api": [
+    "default App()",
+    "determineUserInput()",
+    "composePromptWithSelection()",
+    "formatSelectionSummary()",
+    "buildUnifiedDiff()",
+    "createDiffPreviewFlow()"
+  ],
+  "deps_in": [
+    "src/main.tsx",
+    "src/App.ui.test.tsx"
+  ],
+  "deps_out": [
+    "src/useSetupCheck.ts",
+    "src/useOllamaStream.ts",
+    "src/security/dangerWords.ts",
+    "src/security/sanitizeUserInput.ts",
+    "src/KeybindOverlay.tsx"
+  ],
+  "tests": [
+    "src/App.ui.test.tsx"
+  ]
+}

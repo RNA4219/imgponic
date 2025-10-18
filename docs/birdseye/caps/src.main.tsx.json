@@ -1,0 +1,9 @@
+{
+  "id": "src/main.tsx",
+  "role": "frontend-entry",
+  "summary": "React エントリポイント。DOM root に App コンポーネントをマウントするのみ。副作用はブラウザ側のレンダリング初期化。",
+  "public_api": [],
+  "deps_in": [],
+  "deps_out": ["src/App.tsx"],
+  "tests": []
+}

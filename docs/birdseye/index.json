@@ -1,0 +1,26 @@
+{
+  "generated_at": "2025-10-18T12:20:04Z",
+  "nodes": {
+    "src/main.tsx": {
+      "role": "frontend-entry",
+      "caps": "docs/birdseye/caps/src.main.tsx.json",
+      "mtime": "2025-10-18T06:22:51Z"
+    },
+    "src/App.tsx": {
+      "role": "ui-shell",
+      "caps": "docs/birdseye/caps/src.App.tsx.json",
+      "mtime": "2025-10-18T12:18:24Z"
+    },
+    "src/main.rs": {
+      "role": "backend-tauri",
+      "caps": "docs/birdseye/caps/src.main.rs.json",
+      "mtime": "2025-10-18T12:18:24Z"
+    }
+  },
+  "edges": [
+    ["src/main.tsx", "src/App.tsx"],
+    ["src/App.tsx", "src/main.tsx"],
+    ["src/App.tsx", "src/main.rs"],
+    ["src/main.rs", "src/App.tsx"]
+  ]
+}
