@@ -1,8 +1,9 @@
-use serde::Deserialize;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+
+use futures_util::future::{AbortHandle, Abortable};
+use serde::Deserialize;
 use tokio::sync::Mutex;
-use tokio::task::{AbortHandle, Abortable};
 #[derive(Clone, Default)]
 pub struct StreamState {
     inner: Arc<Mutex<Option<TrackedHandle>>>,
@@ -64,8 +65,8 @@ pub fn parse_ollama_jsonl_chunk(line: &str) -> Result<Vec<OllamaEvent>, serde_js
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::future::Aborted;
     use std::time::Duration;
-    use tokio::task::Aborted;
 
     #[tokio::test]
     async fn abort_resets_state() {
