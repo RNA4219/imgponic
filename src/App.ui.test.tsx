@@ -175,6 +175,7 @@ domTest('renders setup guidance banner when model is missing', async () => {
 domTest('renders ollama error banner and clears it on dismiss or retry', async () => {
   let capturedHandlers: Parameters<UseOllamaStreamFn>[0] | null = null
   const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const saveRunCalls: Array<Record<string, unknown> | undefined> = []
 
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({
@@ -191,11 +192,15 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
         isStreaming: false
       }
     },
-    invoke: async (cmd: string) => {
+    invoke: async (cmd: string, args?: Record<string, unknown>) => {
       if (cmd === 'read_workspace') return null
       if (cmd === 'write_workspace') return 'ok'
       if (cmd === 'list_project_files') return []
       if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'save_run') {
+        saveRunCalls.push(args)
+        return undefined
+      }
       if (cmd === 'run_ollama_stream') return undefined
       return undefined
     }
@@ -211,11 +216,39 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
     expect(runButton).toBeInstanceOf(HTMLButtonElement)
     if (!(runButton instanceof HTMLButtonElement)) throw new Error('Expected run button')
 
-    await act(async () => { runButton.click() })
+    const rightTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="right"]'),
+      'right textarea'
+    )
 
+    await act(async () => { runButton.click() })
+    await flushEffects()
+
+    expect(rightTextarea.value).toBe('')
     expect(container.querySelector('[role="alert"]')).toBeNull()
 
     expect(capturedHandlers).toBeTruthy()
+    await act(async () => { capturedHandlers?.onChunk?.('Network reachable') })
+    await flushEffects()
+    expect(rightTextarea.value).toBe('Network reachable')
+
+    await act(async () => {
+      await capturedHandlers?.onEnd?.()
+    })
+    await flushEffects()
+
+    expect(saveRunCalls).toHaveLength(1)
+    expect(saveRunCalls[0]).toMatchObject({
+      recipePath: 'data/recipes/demo.sora2.yaml',
+      final_prompt: 'SYS\n---\nUSER_INPUT',
+      response_text: 'Network reachable'
+    })
+    expect(rightTextarea.value).toBe('Network reachable')
+
+    await act(async () => { runButton.click() })
+    await flushEffects()
+    expect(rightTextarea.value).toBe('')
+
     await act(async () => { capturedHandlers?.onError?.('Network unreachable') })
     await flushEffects()
 
@@ -224,6 +257,7 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
     if (!(alert instanceof HTMLElement)) throw new Error('Expected alert element')
     expect(alert?.textContent ?? '').toContain('Network unreachable')
     expect(consoleError).toHaveBeenCalled()
+    expect(rightTextarea.value).toBe('')
 
     const dismissButton = alert.querySelector('[data-testid="ollama-error-dismiss"]')
     expect(dismissButton).toBeInstanceOf(HTMLButtonElement)
@@ -253,6 +287,7 @@ domTest('aborting stream resets ollama error and calls abort once', async () => 
   const startStreamImpl = vi.fn(async () => {
     throw new Error('network dropped')
   })
+  let capturedHandlers: Parameters<UseOllamaStreamFn>[0] | null = null
 
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({
@@ -261,6 +296,7 @@ domTest('aborting stream resets ollama error and calls abort once', async () => 
       retry: vi.fn(async () => {})
     }),
     useOllamaStream: handlers => {
+      capturedHandlers = handlers
       const [streaming, setStreaming] = React.useState(false)
       const startStream = React.useCallback(async () => {
         setStreaming(true)
@@ -299,6 +335,11 @@ domTest('aborting stream resets ollama error and calls abort once', async () => 
     expect(runButton).toBeInstanceOf(HTMLButtonElement)
     if (!(runButton instanceof HTMLButtonElement)) throw new Error('Expected run button')
 
+    const rightTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="right"]'),
+      'right textarea'
+    )
+
     await act(async () => {
       runButton.click()
     })
@@ -308,6 +349,12 @@ domTest('aborting stream resets ollama error and calls abort once', async () => 
 
     const errorBannerBefore = container.querySelector('[data-testid="ollama-error-banner"]')
     expect(errorBannerBefore).toBeInstanceOf(HTMLElement)
+
+    await act(async () => {
+      capturedHandlers?.onChunk?.('partial output')
+    })
+    await flushEffects()
+    expect(rightTextarea.value).toBe('partial output')
 
     const stopButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('停止'))
     expect(stopButton).toBeInstanceOf(HTMLButtonElement)
@@ -322,6 +369,7 @@ domTest('aborting stream resets ollama error and calls abort once', async () => 
 
     expect(rawAbortStream).toHaveBeenCalledTimes(1)
     expect(container.querySelector('[data-testid="ollama-error-banner"]')).toBeNull()
+    expect(rightTextarea.value).toBe('')
   } finally {
     consoleError.mockRestore()
     await act(async () => {
