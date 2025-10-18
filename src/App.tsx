@@ -9,6 +9,19 @@ import { useOllamaStream } from './useOllamaStream'
 export type ComposeResult = { final_prompt: string; sha256: string; model: string }
 type InvokeFunction = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
+const ACCESSIBILITY_STORAGE_KEYS = {
+  highContrast: 'accessibility:highContrast',
+  typography: 'accessibility:typography'
+} as const
+
+type TypographyPreset = 'normal' | 'relaxed' | 'spacious'
+
+const TYPOGRAPHY_PRESETS: ReadonlyArray<{ id: TypographyPreset; label: string }> = [
+  { id: 'normal', label: '標準' },
+  { id: 'relaxed', label: 'ゆったり' },
+  { id: 'spacious', label: 'ひろびろ' }
+]
+
 const lineIndexBefore = (text: string, endExclusive: number): number =>
   !text.length || endExclusive <= 0 ? 0 : text.slice(0, Math.min(endExclusive, text.length)).split('\n').length - 1
 
@@ -114,6 +127,8 @@ export const createDiffPreviewFlow = (callbacks: DiffPreviewCallbacks) => ({
 })
 
 export default function App() {
+  const [highContrast, setHighContrast] = useState<boolean>(false)
+  const [typographyPreset, setTypographyPreset] = useState<TypographyPreset>('normal')
   // 左右ペインのテキスト状態
   const [leftText, setLeftText]   = useState<string>('ここに入力。Ollama整形は右の▶で実行。')
   const [rightText, setRightText] = useState<string>('（ここに整形結果が出ます）')
@@ -141,6 +156,23 @@ export default function App() {
     onEnd: () => setRunning(false),
     onError: () => setRunning(false)
   })
+
+  useEffect(() => {
+    const storedContrast = localStorage.getItem(ACCESSIBILITY_STORAGE_KEYS.highContrast)
+    if (storedContrast === '1') setHighContrast(true)
+    const storedTypography = localStorage.getItem(ACCESSIBILITY_STORAGE_KEYS.typography)
+    if (storedTypography && TYPOGRAPHY_PRESETS.some(option => option.id === storedTypography)) setTypographyPreset(storedTypography as TypographyPreset)
+  }, [])
+
+  useEffect(() => {
+    const body = document.body
+    const typographyClass = `typography-${typographyPreset}`
+    body.classList.toggle('high-contrast', highContrast)
+    body.classList.add(typographyClass)
+    localStorage.setItem(ACCESSIBILITY_STORAGE_KEYS.highContrast, highContrast ? '1' : '0')
+    localStorage.setItem(ACCESSIBILITY_STORAGE_KEYS.typography, typographyPreset)
+    return () => { body.classList.remove('high-contrast'); body.classList.remove(typographyClass) }
+  }, [highContrast, typographyPreset])
 
   useEffect(() => {
     if (running) {
@@ -333,6 +365,26 @@ export default function App() {
   return (
     <div style={{ padding: 16 }}>
       <h1 style={{ marginTop: 0 }}>PromptForge</h1>
+
+      <div className="toolbar" style={{ gap: 12, margin: '12px 0' }}>
+        <button type="button" className={`btn${highContrast ? ' primary' : ''}`} data-testid="high-contrast-toggle" aria-pressed={highContrast} onClick={() => setHighContrast(prev => !prev)}>
+          ハイコントラスト: {highContrast ? 'ON' : 'OFF'}
+        </button>
+        <label className="toolbar" style={{ gap: 8, alignItems: 'center' }}>
+          <span className="badge">字間・行間</span>
+          <select
+            value={typographyPreset}
+            onChange={event => {
+              const next = event.target.value
+              if (TYPOGRAPHY_PRESETS.some(option => option.id === next)) setTypographyPreset(next as TypographyPreset)
+            }}
+          >
+            {TYPOGRAPHY_PRESETS.map(option => (
+              <option key={option.id} value={option.id}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       {/* ファイルバー（project/ サンドボックス） */}
       <div className="filebar">

@@ -1,5 +1,5 @@
-:root { --bg:#FFFFEE; --ink:#333333; --accent-50:#F6FFF6; --accent-100:#EDFEED; --accent-200:#E4FEE4; --accent-300:#DCFDDC; --accent-400:#D3FDD3; --accent-500:#C4FCC4; --accent-600:#ACDEAC; --accent-700:#95C095; --accent-800:#7DA17D; --accent-900:#668366; --border:#D9D9CA; --panel:#FFFFFD; --shadow:rgba(0,0,0,0.1); }
-body { margin:0; background:var(--bg); color:var(--ink); font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,"Noto Sans JP"; letter-spacing:0.1px; }
+:root { --bg:#FFFFEE; --ink:#333333; --accent-50:#F6FFF6; --accent-100:#EDFEED; --accent-200:#E4FEE4; --accent-300:#DCFDDC; --accent-400:#D3FDD3; --accent-500:#C4FCC4; --accent-600:#ACDEAC; --accent-700:#95C095; --accent-800:#7DA17D; --accent-900:#668366; --border:#D9D9CA; --panel:#FFFFFD; --shadow:rgba(0,0,0,0.1); --text-letter-spacing:0.1px; --text-line-height:1.5; }
+body { margin:0; background:var(--bg); color:var(--ink); font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,"Noto Sans JP"; letter-spacing:var(--text-letter-spacing); }
 .toolbar { display:flex; gap:8px; align-items:center; }
 .btn { border:1px solid var(--accent-600); background:color-mix(in srgb,var(--panel) 80%,transparent); color:var(--accent-700); padding:6px 10px; border-radius:8px; cursor:pointer; transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease; }
 .btn:hover { background:var(--accent-100); }
@@ -11,7 +11,7 @@ body { margin:0; background:var(--bg); color:var(--ink); font-family:ui-sans-ser
 .panel { background:var(--panel); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 12px 24px -12px var(--shadow); }
 .panel h3 { margin:0; padding:10px 12px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; color:var(--ink); }
 .area { flex:1; padding:12px; }
-.area textarea, .area pre { width:100%; height:100%; border:none; outline:none; background:transparent; color:var(--ink); font-size:14px; line-height:1.5; font-family:ui-monospace, Menlo, Consolas, monospace; }
+.area textarea, .area pre { width:100%; height:100%; border:none; outline:none; background:transparent; color:var(--ink); font-size:14px; line-height:var(--text-line-height); font-family:ui-monospace, Menlo, Consolas, monospace; }
 .runpulse { transform:scale(1); transition:transform .15s ease; }
 .runpulse.active { transform:scale(0.92); }
 .badge { font-size:12px; color:var(--accent-700); }
@@ -19,3 +19,14 @@ body { margin:0; background:var(--bg); color:var(--ink); font-family:ui-sans-ser
 .filebar { display:flex; gap:8px; align-items:center; margin:8px 0 16px; }
 input[type="text"] { background:var(--accent-50); color:var(--ink); border:1px solid var(--border); border-radius:8px; padding:6px 8px; box-shadow:inset 0 1px 2px color-mix(in srgb,var(--shadow) 30%,transparent); transition:border-color .2s ease,box-shadow .2s ease; }
 input[type="text"]:focus { border-color:var(--accent-600); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent-600) 25%,transparent); }
+select { background:var(--accent-50); color:var(--ink); border:1px solid var(--border); border-radius:8px; padding:6px 8px; box-shadow:inset 0 1px 2px color-mix(in srgb,var(--shadow) 30%,transparent); }
+
+body.typography-normal { --text-letter-spacing:0.1px; --text-line-height:1.5; }
+body.typography-relaxed { --text-letter-spacing:0.24px; --text-line-height:1.65; }
+body.typography-spacious { --text-letter-spacing:0.36px; --text-line-height:1.8; }
+
+body.high-contrast { --bg:#050505; --ink:#F5F5F5; --panel:#050505; --border:#FFFFFF; --shadow:rgba(255,255,255,0.25); --accent-50:#002B5B; --accent-100:#003D7A; --accent-200:#0052A1; --accent-300:#0067C8; --accent-400:#0A7EEB; --accent-500:#2C9EFF; --accent-600:#57B2FF; --accent-700:#85C7FF; --accent-800:#B5DDFF; --accent-900:#E1F3FF; font-weight:600; --text-letter-spacing:0.35px; --text-line-height:1.7; }
+body.high-contrast .panel { border-color:var(--border); box-shadow:0 0 0 2px var(--border); }
+body.high-contrast .panel h3 { border-color:var(--border); }
+body.high-contrast .btn { border-color:var(--border); color:var(--ink); box-shadow:0 0 0 1px var(--border) inset; }
+body.high-contrast .btn.primary { background:var(--accent-400); color:#FFFFFF; }
