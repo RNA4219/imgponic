@@ -8,8 +8,10 @@ if [[ -z "${real_pkg_config}" ]]; then
 fi
 
 declare -A mappings=(
-  ["javascriptcoregtk-4.0"]="javascriptcoregtk-4.1"
-  ["webkit2gtk-4.0"]="webkit2gtk-4.1"
+  ["javascriptcoregtk-4.0"]="javascriptcoregtk-6.0"
+  ["javascriptcoregtk-4.1"]="javascriptcoregtk-6.0"
+  ["webkit2gtk-4.0"]="webkitgtk-6.0"
+  ["webkit2gtk-4.1"]="webkitgtk-6.0"
 )
 
 args=("$@")
