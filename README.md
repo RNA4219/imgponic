@@ -6,11 +6,13 @@ last_reviewed_at: 2024-10-01
 next_review_due: 2025-04-01
 ---
 
-<!-- markdownlint-disable MD013 -->
 <!-- markdownlint-disable-next-line MD022 MD041 -->
 # Imgponic — 想像を育てるプロンプト温室
+
 **Version:** 1.0.0
-**License:** MIT  
+
+**License:** MIT
+
 **Theme:** main `#C4FCC4` / background `#FFFFEE`
 
 Imgponic は、**プロンプトとコードを“育てる”ためのローカルツール**です。
@@ -29,25 +31,28 @@ Ollamaと連携し、**完全ローカル・Docker不要**。
 
 - 直近変更ファイル±2hopのノードIDを index.json から取得
 - 対応する caps/*.json のみ読み込み
+
 <!-- /LLM-BOOTSTRAP -->
 
 ---
 
 ## 🕔 5分で開始（Windows）
 
-> 前提: Windows 10/11、**Node.js LTS**, **Rust (stable)**, **Ollama** がインストール済み
+> 前提: Windows 10/11、**Node.js LTS**, **Rust (stable)**, **Ollama** が
+> インストール済み
 
 ### 1) Ollamaを起動（モデル準備）
 
 ```powershell
-# 例：Llama 3 8B
+## 例：Llama 3 8B
 ollama pull llama3:8b
-# サービスが http://localhost:11434 で応答する状態に
+## サービスが http://localhost:11434 で応答する状態に
 ```
 
 ### 2) リリースを取得
 
-- **NSISインストーラ** または **Portable ZIP** をダウンロード（Releases から）
+- **NSISインストーラ** または **Portable ZIP** をダウンロード
+  （Releases から）
 - インストール or 展開して `imgponic` を起動
 
 ### 3) 初回ランディング
@@ -64,7 +69,8 @@ ollama pull llama3:8b
 ## ✨ 主な機能
 
 - **レシピ合成**：テンプレ片（フラグメント）を順に連結し、`{key}` を展開
-- **Ollama実行**：System/Userを分離して `/api/chat` へ投げる（stream=false）
+- **Ollama実行**：System/Userを分離して `/api/chat` へ投げる
+  （`stream=false`）
 - **サンドボックスI/O**：`project/` で .py/.txt/.md/.json を安全に開く・保存
 - **ワークスペース復元**：前回の編集状態を自動復元（約800msデバウンス保存）
 - **ログ**：`runs/<ts>/` に合成プロンプト・レスポンスを保存
@@ -128,7 +134,8 @@ docs/           # 仕様/設計/配色ほか
 
 ## 🆘 トラブルシュート
 
-- **Ollama unreachable**: モデルが未pull/未起動。`ollama pull llama3:8b` を確認。
+- **Ollama unreachable**: モデルが未pull/未起動。
+  `ollama pull llama3:8b` を確認。
 - **path out of sandbox**: `project/` や `prompts/` 等の**内側**で操作してください。
 - **文字化け**: UTF-8（BOM推奨しない）で保存してください。
 - **長文が重い**: 選択範囲だけ送る機能は v0.4 で追加予定。
@@ -140,8 +147,8 @@ docs/           # 仕様/設計/配色ほか
 1. `docs/INCIDENT_TEMPLATE.md` をコピーし、`docs/IN-YYYYMMDD-XXX.md` として保存
    （例: [IN-20250215-001](docs/IN-20250215-001.md)、
    想定: [IN-20250310-001](docs/IN-20250310-001.md)）。
-2. 検知・影響・5Whys・再発防止・タイムラインを Runbook/Evaluation の要件に沿って記入し、
-   各節へ Blueprint/Evaluation の該当リンクを差し込む。
+2. 検知・影響・5Whys・再発防止・タイムラインを Runbook/Evaluation の要件に沿って
+   記入し、各節へ Blueprint/Evaluation の該当リンクを差し込む。
 3. 対応完了後は関連PRと RUNBOOK/EVALUATION へ相互リンクを追加し、
    Preventive Actions の追跡Issueを更新して README の運用例を最新化。
 
@@ -157,5 +164,3 @@ docs/           # 仕様/設計/配色ほか
 ## 📜 ライセンス
 
 [MIT](LICENSE) © 2025 Imgponic contributors
-
-<!-- markdownlint-enable MD013 -->
