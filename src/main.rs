@@ -181,6 +181,61 @@ struct ChatPayload {
     messages: Vec<ChatMessage>,
 }
 
+pub(crate) trait StreamEventEmitter {
+    fn emit_chunk(&self, text: String);
+    fn emit_end(&self);
+    fn emit_error(&self, msg: String);
+}
+
+struct WindowStreamEventEmitter<'a> {
+    window: &'a tauri::Window,
+}
+
+impl<'a> StreamEventEmitter for WindowStreamEventEmitter<'a> {
+    fn emit_chunk(&self, text: String) {
+        let _ = self.window.emit("ollama:chunk", text);
+    }
+
+    fn emit_end(&self) {
+        let _ = self.window.emit("ollama:end", ());
+    }
+
+    fn emit_error(&self, msg: String) {
+        let _ = self.window.emit("ollama:error", msg);
+    }
+}
+
+pub(crate) fn process_stream_line<E: StreamEventEmitter>(
+    line: &str,
+    emitter: &E,
+) -> Result<bool, String> {
+    if line.trim().is_empty() {
+        return Ok(false);
+    }
+
+    let events = parse_ollama_jsonl_chunk(line).map_err(|err| err.to_string())?;
+    let mut finished = false;
+    for event in events {
+        match event {
+            OllamaEvent::Chunk(text) => emitter.emit_chunk(text),
+            OllamaEvent::Done => {
+                emitter.emit_end();
+                finished = true;
+            }
+            OllamaEvent::Error(msg) => {
+                emitter.emit_error(msg);
+                finished = true;
+            }
+        }
+
+        if finished {
+            break;
+        }
+    }
+
+    Ok(finished)
+}
+
 #[tauri::command]
 async fn run_ollama_chat(
     model: String,
@@ -259,35 +314,8 @@ async fn run_ollama_stream(
                 .await
                 .map_err(|err| err.to_string())?;
             let mut stream = response.bytes_stream();
-
-            let mut process_line = |line: &str| -> Result<(), String> {
-                if line.trim().is_empty() {
-                    return Ok(());
-                }
-                match parse_ollama_jsonl_chunk(line) {
-                    Ok(events) => {
-                        for event in events {
-                            match event {
-                                OllamaEvent::Chunk(text) => {
-                                    let _ = window_for_task.emit("ollama:chunk", text);
-                                }
-                                OllamaEvent::Done => {
-                                    finished = true;
-                                    let _ = window_for_task.emit("ollama:end", ());
-                                }
-                                OllamaEvent::Error(msg) => {
-                                    finished = true;
-                                    let _ = window_for_task.emit("ollama:error", msg);
-                                }
-                            }
-                            if finished {
-                                break;
-                            }
-                        }
-                        Ok(())
-                    }
-                    Err(err) => Err(err.to_string()),
-                }
+            let emitter = WindowStreamEventEmitter {
+                window: &window_for_task,
             };
 
             while let Some(item) = stream.next().await {
@@ -297,7 +325,9 @@ async fn run_ollama_stream(
                     if let Some(pos) = buffer.find('\n') {
                         let chunk: String = buffer.drain(..=pos).collect();
                         let line = chunk.trim_end_matches(['\r', '\n']);
-                        process_line(line)?;
+                        if process_stream_line(line, &emitter)? {
+                            finished = true;
+                        }
                     } else {
                         break;
                     }
@@ -308,7 +338,9 @@ async fn run_ollama_stream(
             }
 
             if !finished && !buffer.trim().is_empty() {
-                process_line(buffer.trim_end())?;
+                if process_stream_line(buffer.trim_end(), &emitter)? {
+                    finished = true;
+                }
             }
             Ok(())
         }

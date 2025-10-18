@@ -8,6 +8,8 @@ use tempfile::{tempdir, tempdir_in};
 
 pub use super::_compose_prompt;
 
+use super::{process_stream_line, StreamEventEmitter};
+
 pub struct DataDirGuard {
     prev: Option<OsString>,
 }
@@ -188,4 +190,45 @@ mod compose_prompt_sandbox {
         let result = _compose_prompt(&recipe_path, None).expect("compose prompt");
         assert!(result.final_prompt.contains("Hello"));
     }
+}
+
+#[derive(Default)]
+struct RecordingEmitter {
+    events: std::sync::Mutex<Vec<String>>,
+}
+
+impl StreamEventEmitter for RecordingEmitter {
+    fn emit_chunk(&self, text: String) {
+        self.events.lock().unwrap().push(format!("chunk:{text}"));
+    }
+
+    fn emit_end(&self) {
+        self.events.lock().unwrap().push("end".into());
+    }
+
+    fn emit_error(&self, msg: String) {
+        self.events.lock().unwrap().push(format!("error:{msg}"));
+    }
+}
+
+impl RecordingEmitter {
+    fn snapshot(&self) -> Vec<String> {
+        self.events.lock().unwrap().clone()
+    }
+}
+
+#[tokio::test]
+async fn process_stream_line_signals_completion_on_done_with_leftover_buffer() {
+    let emitter = RecordingEmitter::default();
+    let line = r#"{"done":true}"#;
+    let _leftover_buffer = "still_pending";
+
+    let finished = process_stream_line(line, &emitter).expect("process line");
+
+    assert!(finished, "processing should stop after done event");
+    assert_eq!(
+        emitter.snapshot(),
+        vec!["end"],
+        "done should emit end event"
+    );
 }
