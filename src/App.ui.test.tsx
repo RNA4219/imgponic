@@ -360,3 +360,123 @@ domTest('renders danger word badge only when left pane contains dangerous phrase
   await act(async () => { root.unmount() })
   container.remove()
 })
+
+domTest('saves stream results once the stream completes', async () => {
+  const saveRunCalls: Array<Record<string, unknown>> = []
+  appMockContainer.__APP_MOCKS__ = {
+    invoke: async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT final', sha256: 'hash', model: 'm' }
+      if (cmd === 'save_run') {
+        saveRunCalls.push(args ?? {})
+        return 'ok'
+      }
+      return undefined
+    },
+    useOllamaStream: handlers => ({
+      startStream: async () => {
+        handlers?.onChunk?.('first ')
+        handlers?.onChunk?.('second')
+        await Promise.resolve()
+        await handlers?.onEnd?.()
+      },
+      abortStream: async () => {},
+      appendChunk: chunk => handlers?.onChunk?.(chunk),
+      isStreaming: false
+    })
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+  await act(async () => { root.render(<App />) })
+
+  const runButton = container.querySelector('.runpulse')
+  assert.ok(runButton instanceof HTMLButtonElement)
+  await act(async () => { runButton.click() })
+  await act(async () => { await Promise.resolve() })
+  await act(async () => { await Promise.resolve() })
+
+  assert.equal(saveRunCalls.length, 1)
+  const saveArgs = saveRunCalls[0] as { recipePath?: string; final_prompt?: string; response_text?: string }
+  assert.equal(saveArgs.recipePath, 'data/recipes/demo.sora2.yaml')
+  assert.equal(saveArgs.final_prompt, 'SYS\n---\nUSER_INPUT final')
+  assert.equal(saveArgs.response_text, 'first second')
+
+  const rightTextarea = container.querySelector('textarea[data-side="right"]')
+  assert.ok(rightTextarea instanceof HTMLTextAreaElement)
+  assert.equal(rightTextarea.value, 'first second')
+
+  await act(async () => { root.unmount() })
+  container.remove()
+})
+
+domTest('clears accumulated stream text after aborts and errors', async () => {
+  const savedTexts: string[] = []
+  let streamApi: ReturnType<UseOllamaStreamFn> | null = null
+  let startCount = 0
+  appMockContainer.__APP_MOCKS__ = {
+    invoke: async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT final', sha256: 'hash', model: 'm' }
+      if (cmd === 'save_run') {
+        savedTexts.push(String((args ?? {}).response_text ?? ''))
+        return 'ok'
+      }
+      return undefined
+    },
+    useOllamaStream: handlers => {
+      streamApi = {
+        startStream: async () => {
+          startCount += 1
+          if (startCount === 1) {
+            handlers?.onChunk?.('first')
+          } else if (startCount === 2) {
+            handlers?.onChunk?.('second')
+            handlers?.onError?.('boom')
+          } else if (startCount === 3) {
+            handlers?.onChunk?.('third')
+            await handlers?.onEnd?.()
+          }
+        },
+        abortStream: async () => {
+          await handlers?.onEnd?.()
+        },
+        appendChunk: chunk => handlers?.onChunk?.(chunk),
+        isStreaming: false
+      }
+      return streamApi
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+  await act(async () => { root.render(<App />) })
+
+  const runButton = container.querySelector('.runpulse')
+  assert.ok(runButton instanceof HTMLButtonElement)
+
+  await act(async () => { runButton.click() })
+  await act(async () => { await Promise.resolve() })
+  assert.ok(streamApi)
+  await act(async () => { await streamApi?.abortStream() })
+  await act(async () => { await Promise.resolve() })
+  assert.deepEqual(savedTexts, ['first'])
+
+  await act(async () => { runButton.click() })
+  await act(async () => { await Promise.resolve() })
+  assert.deepEqual(savedTexts, ['first'])
+
+  await act(async () => { runButton.click() })
+  await act(async () => { await Promise.resolve() })
+  await act(async () => { await Promise.resolve() })
+  assert.deepEqual(savedTexts, ['first', 'third'])
+
+  const rightTextarea = container.querySelector('textarea[data-side="right"]')
+  assert.ok(rightTextarea instanceof HTMLTextAreaElement)
+  assert.equal(rightTextarea.value, 'third')
+
+  await act(async () => { root.unmount() })
+  container.remove()
+})
