@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-10-18T13:36:07Z",
+  "generated_at": "2025-10-18T14:12:00Z",
   "nodes": {
     "src/main.tsx": {
       "role": "frontend-entry",
@@ -25,6 +25,21 @@
       "role": "frontend-hook",
       "caps": "docs/birdseye/caps/src.useOllamaStream.ts.json",
       "mtime": "2025-10-18T05:06:18Z"
+    },
+    "src/security/dangerWords.ts": {
+      "role": "security-lexicon",
+      "caps": "docs/birdseye/caps/src.security.dangerWords.ts.json",
+      "mtime": "2025-10-18T09:20:00Z"
+    },
+    "src/security/sanitizeUserInput.ts": {
+      "role": "security-sanitizer",
+      "caps": "docs/birdseye/caps/src.security.sanitizeUserInput.ts.json",
+      "mtime": "2025-10-18T09:21:00Z"
+    },
+    "src/KeybindOverlay.tsx": {
+      "role": "ui-component",
+      "caps": "docs/birdseye/caps/src.KeybindOverlay.tsx.json",
+      "mtime": "2025-10-18T07:45:00Z"
     }
   },
   "edges": [
@@ -33,6 +48,9 @@
     ["src/App.tsx", "src/useOllamaStream.ts"],
     ["src/App.tsx", "src/main.rs"],
     ["src/useSetupCheck.ts", "src/main.rs"],
-    ["src/useOllamaStream.ts", "src/main.rs"]
+    ["src/useOllamaStream.ts", "src/main.rs"],
+    ["src/App.tsx", "src/security/dangerWords.ts"],
+    ["src/App.tsx", "src/security/sanitizeUserInput.ts"],
+    ["src/App.tsx", "src/KeybindOverlay.tsx"]
   ]
 }

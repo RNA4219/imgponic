@@ -1,0 +1,20 @@
+{
+  "id": "src/KeybindOverlay.tsx",
+  "role": "ui-component",
+  "summary": "ショートカット一覧をモーダル表示し、? キーや Esc 入力で開閉状態を管理するアクセシブルな React コンポーネント。フォーカス移動と仕様書リンクを含み、イベントハンドラでトグル判定を再利用可能にする。",
+  "public_api": [
+    "resolveKeybindOverlayState(current, event)",
+    "KEYBIND_SHORTCUTS",
+    "default KeybindOverlay(props)"
+  ],
+  "deps_in": [
+    "src/App.tsx",
+    "src/App.ui.test.tsx"
+  ],
+  "deps_out": [
+    "react"
+  ],
+  "tests": [
+    "src/App.ui.test.tsx"
+  ]
+}
