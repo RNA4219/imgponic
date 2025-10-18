@@ -16,7 +16,6 @@ next_review_due: 2025-04-01
 **Theme:** main `#C4FCC4` / background `#FFFFEE`
 
 Imgponic は、**プロンプトとコードを“育てる”ためのローカルツール**です。
-
 左右2ペインで編集→整形→反映のループを高速に回せます。
 Ollamaと連携し、**完全ローカル・Docker不要**。
 
@@ -25,7 +24,8 @@ Ollamaと連携し、**完全ローカル・Docker不要**。
 読む順番:
 
 1. docs/birdseye/index.json …… ノード一覧・隣接関係（軽量）
-2. docs/birdseye/caps/{path}.json …… 必要ノードだけ point read（個別カプセル）
+2. docs/birdseye/caps/{path}.json …… 必要ノードだけ point read
+   （個別カプセル）
 
 フォーカス手順:
 
