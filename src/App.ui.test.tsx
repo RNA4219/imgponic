@@ -6,10 +6,55 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react-dom/test-utils'
 
-import * as tauriModule from '@tauri-apps/api/tauri'
+let JSDOMClass: (typeof import('jsdom'))['JSDOM'] | null = null
+try {
+  ;({ JSDOM: JSDOMClass } = await import('jsdom'))
+} catch {
+  JSDOMClass = null
+}
 
-import App, { composePromptWithSelection, createDiffPreviewFlow, determineUserInput } from './App'
-import * as streamModule from './useOllamaStream'
+const domInstance = JSDOMClass ? new JSDOMClass('<!doctype html><html><body></body></html>') : null
+const domAvailable = domInstance !== null
+const globalScope = globalThis as {
+  window?: typeof domInstance extends null ? Record<string, unknown> : typeof domInstance.window
+  document?: typeof domInstance extends null ? Record<string, unknown> : typeof domInstance.window.document
+  navigator?: typeof domInstance extends null ? Record<string, unknown> : typeof domInstance.window.navigator
+}
+
+if (domInstance && !globalScope.window) {
+  globalScope.window = domInstance.window
+  globalScope.document = domInstance.window.document
+  globalScope.navigator = domInstance.window.navigator
+}
+
+if (!domInstance) {
+  globalScope.window ??= {}
+  globalScope.document ??= {}
+  globalScope.navigator ??= {}
+}
+
+const streamModule = await import('./useOllamaStream')
+const setupModule = await import('./useSetupCheck')
+
+type UseSetupCheckFn = typeof setupModule.useSetupCheck
+type UseOllamaStreamFn = typeof streamModule.useOllamaStream
+type AppMocks = { useSetupCheck?: UseSetupCheckFn; useOllamaStream?: UseOllamaStreamFn }
+const appMockContainer = globalThis as typeof globalThis & { __APP_MOCKS__?: AppMocks }
+
+const domTest = domAvailable ? test : test.skip
+
+const {
+  default: App,
+  composePromptWithSelection,
+  createDiffPreviewFlow,
+  determineUserInput
+} = await import('./App')
+
+const {
+  default: KeybindOverlay,
+  KEYBIND_SHORTCUTS,
+  resolveKeybindOverlayState
+} = await import('./KeybindOverlay')
 
 const noopStream = {
   startStream: async () => {},
@@ -17,6 +62,65 @@ const noopStream = {
   appendChunk: () => {},
   isStreaming: false
 } as const
+
+test.afterEach(() => {
+  appMockContainer.__APP_MOCKS__ = undefined
+})
+
+domTest('renders setup guidance banner when offline and retries on demand', async () => {
+  const retry = mock.fn(async () => {})
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({
+      status: 'offline',
+      guidance: 'Start Ollama',
+      retry
+    }),
+    useOllamaStream: () => ({
+      ...noopStream
+    })
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+  await act(async () => { root.render(<App />) })
+
+  const banner = container.querySelector('[data-testid="setup-banner"]')
+  assert.ok(banner instanceof HTMLElement)
+  assert.ok(banner.textContent?.includes('Start Ollama'))
+
+  const retryButton = container.querySelector('[data-testid="setup-banner-retry"]')
+  assert.ok(retryButton instanceof HTMLButtonElement)
+  await act(async () => { retryButton.click() })
+
+  assert.equal(retry.mock.calls.length, 1)
+
+  await act(async () => { root.unmount() })
+  container.remove()
+})
+
+domTest('renders setup guidance banner when model is missing', async () => {
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({
+      status: 'missing-model',
+      guidance: 'Install recommended model',
+      retry: mock.fn(async () => {})
+    }),
+    useOllamaStream: () => ({
+      ...noopStream
+    })
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+  await act(async () => { root.render(<App />) })
+
+  const banner = container.querySelector('[data-testid="setup-banner"]')
+  assert.ok(banner instanceof HTMLElement)
+  assert.ok(banner.textContent?.includes('Install recommended model'))
+
+  await act(async () => { root.unmount() })
+  container.remove()
+})
 
 test('determineUserInput returns selection context with line range header', () => {
   const leftText = Array.from({ length: 12 }, (_, idx) => `line-${idx + 1}`).join('\n')
@@ -146,32 +250,34 @@ test('keybind overlay lists primary shortcuts from spec link', () => {
   )
 })
 
-test('loads corpus excerpt, injects into compose params, and renders preview metadata', async () => {
+domTest('loads corpus excerpt, injects into compose params, and renders preview metadata', async () => {
   const composeCalls: Array<Record<string, unknown>> = []
-  const invokeMock = mock.method(tauriModule, 'invoke', async (cmd: string, args?: Record<string, unknown>) => {
-    if (cmd === 'read_workspace') return null
-    if (cmd === 'write_workspace') return 'ok'
-    if (cmd === 'load_txt_excerpt') {
-      assert.ok(args)
-      return {
-        path: String(args?.path ?? ''),
-        excerpt: '頭 75% ... 尾 25%',
-        sha256: 'deadbeefcafebabe',
-        truncated: true,
-        size_bytes: 1200,
-        used_bytes: 400
+  appMockContainer.__APP_MOCKS__ = {
+    invoke: async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'load_txt_excerpt') {
+        assert.ok(args)
+        return {
+          path: String(args?.path ?? ''),
+          excerpt: '頭 75% ... 尾 25%',
+          sha256: 'deadbeefcafebabe',
+          truncated: true,
+          size_bytes: 1200,
+          used_bytes: 400
+        }
       }
-    }
-    if (cmd === 'compose_prompt') {
-      composeCalls.push(args ?? {})
-      return { final_prompt: 'prompt', sha256: 'hash', model: 'm' }
-    }
-    if (cmd === 'run_ollama_stream') return undefined
-    return undefined
-  })
-  const streamMock = mock.method(streamModule, 'useOllamaStream', () => ({
-    ...noopStream
-  }))
+      if (cmd === 'compose_prompt') {
+        composeCalls.push(args ?? {})
+        return { final_prompt: 'prompt', sha256: 'hash', model: 'm' }
+      }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
+    },
+    useOllamaStream: () => ({
+      ...noopStream
+    })
+  }
 
   const container = document.body.appendChild(document.createElement('div'))
   const root = createRoot(container)
@@ -207,20 +313,20 @@ test('loads corpus excerpt, injects into compose params, and renders preview met
 
   await act(async () => { root.unmount() })
   container.remove()
-  invokeMock.restore()
-  streamMock.restore()
 })
 
-test('renders danger word badge only when left pane contains dangerous phrases', async () => {
-  const invokeMock = mock.method(tauriModule, 'invoke', async (cmd: string) => {
-    if (cmd === 'read_workspace') return null
-    if (cmd === 'write_workspace') return 'ok'
-    if (cmd === 'list_project_files') return []
-    return undefined
-  })
-  const streamMock = mock.method(streamModule, 'useOllamaStream', () => ({
-    ...noopStream
-  }))
+domTest('renders danger word badge only when left pane contains dangerous phrases', async () => {
+  appMockContainer.__APP_MOCKS__ = {
+    invoke: async (cmd: string) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      return undefined
+    },
+    useOllamaStream: () => ({
+      ...noopStream
+    })
+  }
 
   const container = document.body.appendChild(document.createElement('div'))
   const root = createRoot(container)
@@ -246,6 +352,4 @@ test('renders danger word badge only when left pane contains dangerous phrases',
 
   await act(async () => { root.unmount() })
   container.remove()
-  invokeMock.restore()
-  streamMock.restore()
 })

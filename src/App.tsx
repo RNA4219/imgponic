@@ -3,11 +3,32 @@ import { invoke } from '@tauri-apps/api/tauri'
 import { writeText } from '@tauri-apps/api/clipboard'
 import { save } from '@tauri-apps/api/dialog'
 import { writeTextFile } from '@tauri-apps/api/fs'
-import './app.css'
 import { containsDangerWords } from './security/dangerWords'
 import { useOllamaStream } from './useOllamaStream'
+import { useSetupCheck } from './useSetupCheck'
 import KeybindOverlay, { resolveKeybindOverlayState } from './KeybindOverlay'
 import { sanitizeUserInput, SanitizedUserInput } from './security/sanitizeUserInput'
+
+if (typeof document !== 'undefined' && typeof (document as { createElement?: unknown }).createElement === 'function') {
+  void import('./app.css')
+}
+
+type AppMocks = {
+  useSetupCheck?: typeof useSetupCheck
+  useOllamaStream?: typeof useOllamaStream
+  invoke?: typeof invoke
+}
+
+const selectAppMocks = (): AppMocks =>
+  (globalThis as typeof globalThis & { __APP_MOCKS__?: AppMocks }).__APP_MOCKS__ ?? {}
+
+const resolveUseSetupCheckHook = (): typeof useSetupCheck =>
+  selectAppMocks().useSetupCheck ?? useSetupCheck
+
+const resolveUseOllamaStreamHook = (): typeof useOllamaStream =>
+  selectAppMocks().useOllamaStream ?? useOllamaStream
+
+const resolveInvokeFn = (): typeof invoke => selectAppMocks().invoke ?? invoke
 
 export type ComposeResult = { final_prompt: string; sha256: string; model: string }
 type InvokeFunction = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
@@ -158,6 +179,10 @@ export default function App() {
   // レシピ/モデル
   const [recipePath, setRecipePath] = useState('data/recipes/demo.sora2.yaml')
   const [ollamaModel, setOllamaModel] = useState('llama3:8b')
+  const useSetupCheckHook = resolveUseSetupCheckHook()
+  const { status: setupStatus, guidance: setupGuidance, retry: retrySetupCheck } = useSetupCheckHook(ollamaModel)
+  const showSetupBanner = setupStatus === 'offline' || setupStatus === 'missing-model'
+  const invokeFn = resolveInvokeFn()
 
   // パラメータ
   const [params, setParams] = useState({ goal: '30秒の戦闘シーン', tone: '冷静', steps: 6, user_input: '' })
@@ -230,7 +255,7 @@ export default function App() {
     setDocExcerptStatus('loading')
     setDocExcerptError(null)
     try {
-      const result = await invoke<DocExcerpt>('load_txt_excerpt', { path: trimmed })
+      const result = await invokeFn<DocExcerpt>('load_txt_excerpt', { path: trimmed })
       setDocExcerpt(result)
       setDocExcerptStatus('success')
       setParams(prev => ({ ...prev, doc_excerpt: result.excerpt }))
@@ -249,13 +274,13 @@ export default function App() {
       })
       alert('抜粋読込失敗: ' + message)
     }
-  }, [corpusRel])
+  }, [corpusRel, invokeFn])
 
   // === Workspace: Restore on startup ===
   useEffect(() => {
     (async () => {
       try {
-        const ws = await invoke<Workspace | null>('read_workspace')
+        const ws = await invokeFn<Workspace | null>('read_workspace')
         if (ws) {
           if (ws.left_text) setLeftText(ws.left_text)
           if (ws.right_text) setRightText(ws.right_text)
@@ -268,7 +293,7 @@ export default function App() {
         console.warn('workspace load failed', e)
       }
     })()
-  }, [])
+  }, [invokeFn])
 
   // === Workspace: Autosave (debounced 800ms) ===
   const saveTimer = useRef<number | null>(null)
@@ -286,7 +311,7 @@ export default function App() {
         project_path: projRel
       }
       try {
-        await invoke<string>('write_workspace', { ws })
+        await invokeFn<string>('write_workspace', { ws })
       } catch (e) {
         console.warn('workspace save failed', e)
       }
@@ -294,7 +319,7 @@ export default function App() {
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current)
     }
-  }, [leftText, rightText, recipePath, ollamaModel, params, projRel])
+  }, [leftText, rightText, recipePath, ollamaModel, params, projRel, invokeFn])
 
   // ヘルパ：コピー／保存
   const copy = useCallback(async (txt: string) => { await writeText(txt) }, [])
@@ -306,6 +331,7 @@ export default function App() {
   // 合成
   const doCompose = useCallback(async () => {
     const res = await composePromptWithSelection({
+      invokeFn,
       params,
       recipePath,
       leftText,
@@ -320,7 +346,7 @@ export default function App() {
     })
     setComposed(res)
     return res
-  }, [params, recipePath, leftText, sendSelectionOnly, leftSelection, leftSelectionStart, leftSelectionEnd])
+  }, [invokeFn, params, recipePath, leftText, sendSelectionOnly, leftSelection, leftSelectionStart, leftSelectionEnd])
 
   // 実行（▶）
   const runOllama = useCallback(async () => {
@@ -384,51 +410,51 @@ export default function App() {
   const openProjectToLeft = useCallback(async () => {
     if (!projRel) return
     try {
-      const r = await invoke<{path:string, content:string}>('read_project_file', { relPath: projRel })
+      const r = await invokeFn<{path:string, content:string}>('read_project_file', { relPath: projRel })
       setLeftText(r.content)
     } catch (e:any) {
       alert('読み込み失敗: ' + String(e))
     }
-  }, [projRel])
+  }, [projRel, invokeFn])
 
   const openProjectToRight = useCallback(async () => {
     if (!projRel) return
     try {
-      const r = await invoke<{path:string, content:string}>('read_project_file', { relPath: projRel })
+      const r = await invokeFn<{path:string, content:string}>('read_project_file', { relPath: projRel })
       setRightText(r.content)
     } catch (e:any) {
       alert('読み込み失敗: ' + String(e))
     }
-  }, [projRel])
+  }, [projRel, invokeFn])
 
   const saveLeftToProject = useCallback(async () => {
     if (!projRel) return
     try {
-      await invoke<string>('write_project_file', { relPath: projRel, content: leftText })
+      await invokeFn<string>('write_project_file', { relPath: projRel, content: leftText })
       alert('保存しました: project/' + projRel)
     } catch (e:any) {
       alert('保存失敗: ' + String(e))
     }
-  }, [projRel, leftText])
+  }, [projRel, leftText, invokeFn])
 
   const saveRightToProject = useCallback(async () => {
     if (!projRel) return
     try {
-      await invoke<string>('write_project_file', { relPath: projRel, content: rightText })
+      await invokeFn<string>('write_project_file', { relPath: projRel, content: rightText })
       alert('保存しました: project/' + projRel)
     } catch (e:any) {
       alert('保存失敗: ' + String(e))
     }
-  }, [projRel, rightText])
+  }, [projRel, rightText, invokeFn])
 
   const listPy = useCallback(async () => {
     try {
-      const files = await invoke<Array<{path:string,name:string,size:number}>>('list_project_files', { exts: ['py'] })
+      const files = await invokeFn<Array<{path:string,name:string,size:number}>>('list_project_files', { exts: ['py'] })
       alert(files.map(f => f.path).join('\n') || '(なし)')
     } catch (e:any) {
       alert('一覧失敗: ' + String(e))
     }
-  }, [])
+  }, [invokeFn])
 
   // ショートカット
   useEffect(() => {
@@ -538,6 +564,35 @@ export default function App() {
 
       {docExcerptStatus === 'error' && docExcerptError && (
         <div style={{ marginBottom: 12, color: '#b91c1c', fontSize: 12 }}>Error: {docExcerptError}</div>
+      )}
+
+      {/* セットアップバナー */}
+      {showSetupBanner && (
+        <div
+          data-testid="setup-banner"
+          className="toolbar"
+          style={{
+            marginBottom: 12,
+            padding: '8px 12px',
+            borderRadius: 4,
+            background: '#fef3c7',
+            color: '#92400e',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12
+          }}
+        >
+          <span style={{ fontSize: 13 }}>{setupGuidance}</span>
+          <button
+            data-testid="setup-banner-retry"
+            className="btn"
+            onClick={() => {
+              void retrySetupCheck()
+            }}
+          >
+            リトライ
+          </button>
+        </div>
       )}
 
       {/* 上部ツールバー */}
