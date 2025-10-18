@@ -251,6 +251,8 @@ await invoke('abort_current_stream')
 ---
 
 ## 15. 付録B：正規表現マスク（案）
+
+<!-- markdownlint-disable MD013 -->
 ```text
 API_KEY-like     : (?i)(api[_-]?key|token|secret)\s*[:=]\s*['"]?[A-Za-z0-9_\-]{16,}['"]?
 Private Key PEM  : -----BEGIN (?:RSA|EC|PRIVATE) KEY-----[\s\S]+?-----END (?:RSA|EC|PRIVATE) KEY-----
@@ -258,5 +260,7 @@ Google creds     : (?i)(AIza[0-9A-Za-z\-_]{35})
 AWS Access Key   : (AKIA|ASIA)[0-9A-Z]{16}
 AWS Secret Key   : (?i)aws(.{0,20})?(secret|access).{0,20}?([A-Za-z0-9/+=]{40})
 ```
+<!-- markdownlint-enable MD013 -->
+
 - マスク形式：`<REDACTED:TYPE>` に置換（保存前/送信前）。
 - 誤検知はUIで解除可能（将来）。
