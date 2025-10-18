@@ -11,6 +11,7 @@ use chrono::Local;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::env;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -74,19 +75,37 @@ fn compose_prompt(
     _compose_prompt(&recipe_path, Some(inline_params)).map_err(|e| e.to_string())
 }
 
+fn resolve_data_root() -> Result<(PathBuf, PathBuf)> {
+    let configured = env::var("PROMPTFORGE_DATA_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("data"));
+    let absolute = if configured.is_absolute() {
+        configured.clone()
+    } else {
+        env::current_dir()?.join(&configured)
+    };
+    Ok((configured, absolute))
+}
+
+fn resolve_under_base(path: &Path, configured_root: &Path, base_abs: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else if let Ok(stripped) = path.strip_prefix(configured_root) {
+        base_abs.join(stripped)
+    } else {
+        base_abs.join(path)
+    }
+}
+
 fn _compose_prompt(
     recipe_path: &str,
     inline_params: Option<serde_json::Value>,
 ) -> Result<ComposeResult> {
+    let (configured_root, base_abs) = resolve_data_root()?;
     let rp = PathBuf::from(recipe_path);
-    let recipe: Recipe = read_yaml(&rp)?;
-
-    // base dir
-    let base = rp
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap_or_else(|| Path::new("."));
+    let resolved_recipe = resolve_under_base(&rp, &configured_root, &base_abs);
+    ensure_under(&base_abs, &resolved_recipe)?;
+    let recipe: Recipe = read_yaml(&resolved_recipe)?;
 
     // merge params (inline override recipe.params)
     let mut params = recipe.params.clone();
@@ -102,9 +121,10 @@ fn _compose_prompt(
     // load fragments
     let mut blocks: Vec<String> = vec![];
     for frag_id in recipe.fragments.iter() {
-        let frag_path = base
+        let frag_path = base_abs
             .join("fragments")
             .join(format!("{}.yaml", frag_id.replace('.', "/")));
+        ensure_under(&base_abs, &frag_path)?;
         let frag: Fragment = read_yaml(&frag_path)
             .with_context(|| format!("Failed to read fragment: {}", frag_path.display()))?;
         let rendered = render_placeholders(&frag.content, &params);
