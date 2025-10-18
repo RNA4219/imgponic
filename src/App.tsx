@@ -217,8 +217,7 @@ export default function App() {
     setHasDangerWords(containsDangerWords(value))
   }, [])
 
-  const useOllamaStreamHook = resolveUseOllamaStreamHook()
-  const { startStream, abortStream, isStreaming } = useOllamaStreamHook({
+  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
     onChunk: chunk => setRightText(prev => prev + chunk),
     onEnd: () => setRunning(false),
     onError: message => {
