@@ -30,6 +30,19 @@ canary rules.
 - 人間にもエージェント（Codex等）にも読ませやすい最小フォーマット
 - 言語・技術スタック非依存（存在するコマンドだけ使う）
 
+## Repository structure
+```
+README.md                # この概要
+workflow-cookbook/docs/  # Birdseye カプセルほかドキュメント
+workflow-cookbook/governance/ # ポリシーとゲート設定
+workflow-cookbook/tools/      # ガバナンス関連ツール
+workflow-cookbook/tests/      # ガバナンス検証用テスト
+workflow-cookbook/scripts/    # CI/運用スクリプト
+workflow-cookbook/examples/   # テンプレートとサンプル
+workflow-cookbook/reports/    # 実行ログやレポート
+workflow-cookbook/logs/       # 実行ログ（ローテーション不要）
+```
+
 ## 使い方（最短）
 
 1. これらのMDをリポジトリ直下に配置

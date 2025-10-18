@@ -49,6 +49,21 @@ ollama pull llama3:8b
 
 ---
 
+## Repository structure
+```
+README.md       # 本ドキュメント
+data/           # レシピ/フラグメント
+project/        # 編集対象（サンドボックス）
+corpus/         # TXTの簡易RAG（将来強化）
+runs/<ts>/      # 実行ログ
+src/            # React
+src-tauri/      # Tauri (Rust)
+scripts/*.bat   # 起動/ビルド補助
+docs/           # 仕様/設計/配色ほか
+```
+
+---
+
 ## 📁 ディレクトリ
 ```
 data/           # レシピ/フラグメント
