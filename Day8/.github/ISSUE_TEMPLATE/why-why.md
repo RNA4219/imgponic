@@ -2,6 +2,10 @@
 name: "反省: Why-Why"
 labels: ["reflection","root-cause"]
 ---
+
+<!-- markdownlint-disable MD001 -->
+# 反省: Why-Why
+
 ### 事象
 
 ### 第1のなぜ
