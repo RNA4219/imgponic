@@ -69,8 +69,9 @@ ollama pull llama3:8b
 ## ✨ 主な機能
 
 - **レシピ合成**：テンプレ片（フラグメント）を順に連結し、`{key}` を展開
-- **Ollama実行**：Rustコマンド `run_ollama_stream` と React フック `useOllamaStream` で
-  chunk を逐次受け取りつつストリーミング表示（ヘッダに Streaming 表示と停止ボタン付き）
+- **Ollama実行**：Rustコマンド `run_ollama_stream` が chunk を逐次送信し、React フック
+  `useOllamaStream` が右ペインへ追記。ヘッダには Streaming インジケータと **停止** ボタン
+  を表示し、任意タイミングでストリームを中断可能。
 - **サンドボックスI/O**：`project/` で .py/.txt/.md/.json を安全に開く・保存
 - **ワークスペース復元**：前回の編集状態を自動復元（約800msデバウンス保存）
 - **ログ**：`runs/<ts>/` に合成プロンプト・レスポンスを保存
@@ -163,7 +164,7 @@ tools/          # 補助スクリプト群
 ## 🗺️ ロードマップ（抜粋）
 
 - **v1.0**（本リリース）: 2ペイン/合成/Ollama/Project I-O/Workspace/ログ/テーマ
-- **v0.4系**（計画）: ストリーミング、選択送信、タブ永続化、差分プレビュー、CI/Docs整備
+- **v0.4系**（計画）: 選択送信、タブ永続化、差分プレビュー、CI/Docs整備
 
 ---
 
