@@ -55,6 +55,12 @@ const TYPOGRAPHY_PRESETS: ReadonlyArray<{ id: TypographyPreset; label: string }>
   { id: 'spacious', label: 'ひろびろ' }
 ]
 
+const describeOllamaError = (reason: unknown): string => {
+  const value = reason instanceof Error ? reason.message : String(reason ?? '')
+  const trimmed = value.trim()
+  return trimmed ? `Ollamaエラー: ${trimmed}` : 'Ollamaエラー: 詳細不明'
+}
+
 const lineIndexBefore = (text: string, endExclusive: number): number =>
   !text.length || endExclusive <= 0 ? 0 : text.slice(0, Math.min(endExclusive, text.length)).split('\n').length - 1
 
@@ -133,7 +139,7 @@ type Workspace = {
   right_text: string
   recipe_path: string
   model: string
-  params: any
+  params: Record<string, unknown>
   updated_at: string
   project_path?: string
 }
@@ -180,6 +186,7 @@ export default function App() {
   const [recipePath, setRecipePath] = useState('data/recipes/demo.sora2.yaml')
   const [ollamaModel, setOllamaModel] = useState('llama3:8b')
   const useSetupCheckHook = resolveUseSetupCheckHook()
+  const useOllamaStreamHook = resolveUseOllamaStreamHook()
   const { status: setupStatus, guidance: setupGuidance, retry: retrySetupCheck } = useSetupCheckHook(ollamaModel)
   const showSetupBanner = setupStatus === 'offline' || setupStatus === 'missing-model'
   const invokeFn = resolveInvokeFn()
@@ -192,17 +199,28 @@ export default function App() {
 
   // 実行ボタン演出
   const [running, setRunning] = useState(false)
+  const [ollamaError, setOllamaError] = useState<string | null>(null)
+  const resetOllamaError = useCallback(() => setOllamaError(null), [])
   const runBtnRef = useRef<HTMLButtonElement>(null)
   const leftTextRef = useRef<HTMLTextAreaElement>(null)
   const [sendSelectionOnly, setSendSelectionOnly] = useState<boolean>(false)
   const [leftSelection, setLeftSelection] = useState<string>('')
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
-  const { startStream, abortStream, isStreaming } = useOllamaStream({
+  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
     onChunk: chunk => setRightText(prev => prev + chunk),
     onEnd: () => setRunning(false),
-    onError: () => setRunning(false)
+    onError: message => {
+      console.error('ollama stream error', message)
+      setRunning(false)
+      setOllamaError(describeOllamaError(message))
+    }
   })
+  const abortStream = useCallback(async () => {
+    resetOllamaError()
+    setRunning(false)
+    await rawAbortStream()
+  }, [resetOllamaError, rawAbortStream])
 
   useEffect(() => {
     const storedContrast = localStorage.getItem(ACCESSIBILITY_STORAGE_KEYS.highContrast)
@@ -351,6 +369,7 @@ export default function App() {
   // 実行（▶）
   const runOllama = useCallback(async () => {
     if (isStreaming) return
+    resetOllamaError()
     setRunning(true)
     setRightText('')
     try {
@@ -368,8 +387,9 @@ export default function App() {
     } catch (error) {
       console.error('run ollama stream failed', error)
       setRunning(false)
+      setOllamaError(describeOllamaError(error))
     }
-  }, [isStreaming, composed, doCompose, startStream, ollamaModel])
+  }, [isStreaming, resetOllamaError, composed, doCompose, startStream, ollamaModel])
 
   // 右→左 反映（プレビュー付き）
   const diffFlow = useMemo(() => createDiffPreviewFlow({ readLeft: () => leftText, readRight: () => rightText, show: value => setDiffPatch(value), apply: value => setLeftText(value), close: () => setDiffPatch(null) }), [leftText, rightText])
@@ -412,8 +432,9 @@ export default function App() {
     try {
       const r = await invokeFn<{path:string, content:string}>('read_project_file', { relPath: projRel })
       setLeftText(r.content)
-    } catch (e:any) {
-      alert('読み込み失敗: ' + String(e))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error ?? '')
+      alert('読み込み失敗: ' + message)
     }
   }, [projRel, invokeFn])
 
@@ -422,8 +443,9 @@ export default function App() {
     try {
       const r = await invokeFn<{path:string, content:string}>('read_project_file', { relPath: projRel })
       setRightText(r.content)
-    } catch (e:any) {
-      alert('読み込み失敗: ' + String(e))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error ?? '')
+      alert('読み込み失敗: ' + message)
     }
   }, [projRel, invokeFn])
 
@@ -432,8 +454,9 @@ export default function App() {
     try {
       await invokeFn<string>('write_project_file', { relPath: projRel, content: leftText })
       alert('保存しました: project/' + projRel)
-    } catch (e:any) {
-      alert('保存失敗: ' + String(e))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error ?? '')
+      alert('保存失敗: ' + message)
     }
   }, [projRel, leftText, invokeFn])
 
@@ -442,8 +465,9 @@ export default function App() {
     try {
       await invokeFn<string>('write_project_file', { relPath: projRel, content: rightText })
       alert('保存しました: project/' + projRel)
-    } catch (e:any) {
-      alert('保存失敗: ' + String(e))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error ?? '')
+      alert('保存失敗: ' + message)
     }
   }, [projRel, rightText, invokeFn])
 
@@ -451,8 +475,9 @@ export default function App() {
     try {
       const files = await invokeFn<Array<{path:string,name:string,size:number}>>('list_project_files', { exts: ['py'] })
       alert(files.map(f => f.path).join('\n') || '(なし)')
-    } catch (e:any) {
-      alert('一覧失敗: ' + String(e))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error ?? '')
+      alert('一覧失敗: ' + message)
     }
   }, [invokeFn])
 
@@ -648,6 +673,25 @@ export default function App() {
           </button>
         </div>
       </div>
+
+      {ollamaError && (
+        <div
+          role="alert"
+          data-testid="ollama-error-banner"
+          className="toolbar"
+          style={{ margin: '12px 0', padding: '12px 16px', background: '#fdecea', color: '#611a15', justifyContent: 'space-between' }}
+        >
+          <span>{ollamaError}</span>
+          <div className="toolbar" style={{ gap: 8 }}>
+            <button className="btn" type="button" data-testid="ollama-error-dismiss" onClick={resetOllamaError}>
+              閉じる
+            </button>
+            <button className="btn primary" type="button" onClick={runOllama}>
+              再試行
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 分割ビュー */}
       <div className="split">
