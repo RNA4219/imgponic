@@ -25,12 +25,16 @@ test('determineUserInput falls back to full text without selection', () => {
   assert.equal(determineUserInput(false, '', sample, null, null, 3), sample)
 })
 
-test('composePromptWithSelection forwards enriched selection preview', async () => {
-  const leftText = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta'].join('\n')
-  const selection = 'gamma'
+test('composePromptWithSelection masks sensitive text before invoking compose_prompt', async () => {
+  const sensitiveLine = "api-key: 'MySecretTokenABCDEFG123456'"
+  const leftText = ['alpha', sensitiveLine, '-----BEGIN RSA PRIVATE KEY-----', 'tail'].join('\n')
+  const selection = sensitiveLine
   const selectionStart = leftText.indexOf(selection)
   let capturedUserInput = ''
+  const order: string[] = []
+  let sanitizedSnapshot: { sanitized: string; maskedTypes: string[]; overLimit: boolean; raw: string } | null = null
   const invokeFn = async (_cmd: string, args?: Record<string, unknown>) => {
+    order.push('invoke')
     capturedUserInput = String((args?.inlineParams as { user_input: string }).user_input)
     return { final_prompt: 'fp', sha256: 'hash', model: 'model' }
   }
@@ -43,10 +47,20 @@ test('composePromptWithSelection forwards enriched selection preview', async () 
     selection,
     selectionStart,
     selectionEnd: selectionStart + selection.length,
-    contextRadius: 3
+    contextRadius: 3,
+    onSanitized: snapshot => {
+      order.push('sanitize')
+      sanitizedSnapshot = snapshot
+    }
   })
-  const expected = determineUserInput(true, selection, leftText, selectionStart, selectionStart + selection.length, 3)
-  assert.equal(capturedUserInput, expected)
+  assert.deepEqual(order, ['sanitize', 'invoke'])
+  assert.ok(sanitizedSnapshot)
+  assert.equal(sanitizedSnapshot?.raw.includes(sensitiveLine), true)
+  assert.equal(sanitizedSnapshot?.overLimit, false)
+  assert.deepEqual(sanitizedSnapshot?.maskedTypes, ['API_KEY'])
+  assert.equal(capturedUserInput.includes('<REDACTED:API_KEY>'), true)
+  assert.equal(capturedUserInput.includes('MySecretToken'), false)
+  assert.equal(capturedUserInput, sanitizedSnapshot?.sanitized)
   assert.deepEqual(res, { final_prompt: 'fp', sha256: 'hash', model: 'model' })
 })
 
