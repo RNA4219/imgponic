@@ -4,8 +4,10 @@ import { invoke } from '@tauri-apps/api/tauri'
 
 export type SetupStatus = 'ok' | 'offline' | 'missing-model'
 
+type BackendSetupStatus = SetupStatus | 'ready' | 'server_unavailable' | 'model_missing'
+
 type SetupCheckResponse = {
-  status: SetupStatus
+  status: BackendSetupStatus
   guidance?: string
 }
 
@@ -20,19 +22,38 @@ const DEFAULT_GUIDANCE: Record<SetupStatus, string> = {
   offline: 'Ollama service is not reachable. Please start Ollama and retry.'
 }
 
-const isSetupStatus = (value: unknown): value is SetupStatus =>
-  value === 'ok' || value === 'offline' || value === 'missing-model'
+const isBackendSetupStatus = (value: unknown): value is BackendSetupStatus =>
+  value === 'ok' ||
+  value === 'offline' ||
+  value === 'missing-model' ||
+  value === 'ready' ||
+  value === 'server_unavailable' ||
+  value === 'model_missing'
+
+const normalizeStatus = (status: BackendSetupStatus): SetupStatus => {
+  switch (status) {
+    case 'ready':
+      return 'ok'
+    case 'server_unavailable':
+      return 'offline'
+    case 'model_missing':
+      return 'missing-model'
+    default:
+      return status
+  }
+}
 
 const normalizeResponse = (response: unknown): SetupState => {
   if (
     response &&
     typeof response === 'object' &&
     'status' in response &&
-    isSetupStatus((response as { status: unknown }).status)
+    isBackendSetupStatus((response as { status: unknown }).status)
   ) {
     const typed = response as SetupCheckResponse
-    const guidance = typed.guidance ?? DEFAULT_GUIDANCE[typed.status]
-    return { status: typed.status, guidance }
+    const status = normalizeStatus(typed.status)
+    const guidance = typed.guidance ?? DEFAULT_GUIDANCE[status]
+    return { status, guidance }
   }
 
   return { status: 'offline', guidance: DEFAULT_GUIDANCE.offline }
