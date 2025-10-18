@@ -13,7 +13,7 @@ next_review_due: 2025-11-14
 - 必須要件（フォーマット・件数・整合性など）
 - PR本文に Priority Score（値と根拠）が記録されていること。
 - governance/policy.yaml の forbidden_paths を変更しないこと。
-- インシデント発生時は docs/IN-YYYYMMDD-XXX.md を作成し、該当PRおよびRUNBOOKから相互リンクする
+- インシデント発生時は [`docs/INCIDENT_TEMPLATE.md`](../../docs/INCIDENT_TEMPLATE.md) に沿って作成し、最新例（[IN-20250215-001](../../docs/IN-20250215-001.md)）が該当PRおよびRUNBOOKから相互リンクされていること
 
 ## KPIs
 
