@@ -8,7 +8,7 @@ import { afterEach, test, vi } from 'vitest'
 
 let JSDOMClass: (typeof import('jsdom'))['JSDOM'] | null = null
 try {
-  ;({ JSDOM: JSDOMClass } = await import('jsdom'))
+  ({ JSDOM: JSDOMClass } = await import('jsdom'))
 } catch {
   JSDOMClass = null
 }
@@ -120,6 +120,66 @@ domTest('renders setup guidance banner when model is missing', async () => {
 
   await act(async () => { root.unmount() })
   container.remove()
+})
+
+domTest('renders ollama error banner and clears it on dismiss or retry', async () => {
+  let capturedHandlers: Parameters<UseOllamaStreamFn>[0] | null = null
+  const consoleError = mock.method(console, 'error', () => {})
+
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({
+      status: 'ready',
+      guidance: '',
+      retry: mock.fn(async () => {})
+    }),
+    useOllamaStream: handlers => {
+      capturedHandlers = handlers
+      return {
+        startStream: async () => {},
+        abortStream: async () => {},
+        appendChunk: () => {},
+        isStreaming: false
+      }
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  try {
+    await act(async () => { root.render(<App />) })
+
+    const runButton = container.querySelector('.runpulse')
+    assert.ok(runButton instanceof HTMLButtonElement)
+
+    await act(async () => { runButton.click() })
+
+    assert.equal(container.querySelector('[role="alert"]'), null)
+
+    assert.ok(capturedHandlers)
+    await act(async () => { capturedHandlers?.onError?.('Network unreachable') })
+
+    const alert = container.querySelector('[role="alert"]')
+    assert.ok(alert instanceof HTMLElement)
+    assert.ok(alert.textContent?.includes('Network unreachable'))
+    assert.ok(consoleError.mock.calls.length > 0)
+
+    const dismissButton = alert.querySelector('[data-testid="ollama-error-dismiss"]')
+    assert.ok(dismissButton instanceof HTMLButtonElement)
+    await act(async () => { dismissButton.click() })
+
+    assert.equal(container.querySelector('[role="alert"]'), null)
+
+    await act(async () => { capturedHandlers?.onError?.('Network unreachable') })
+    assert.ok(container.querySelector('[role="alert"]'))
+
+    await act(async () => { runButton.click() })
+    assert.equal(container.querySelector('[role="alert"]'), null)
+  } finally {
+    consoleError.mock.restore()
+    await act(async () => { root.unmount() })
+    container.remove()
+  }
 })
 
 test('determineUserInput returns selection context with line range header', () => {
@@ -338,11 +398,18 @@ domTest('renders danger word badge only when left pane contains dangerous phrase
   const textarea = container.querySelector('textarea[data-side="left"]')
   assert.ok(textarea instanceof HTMLTextAreaElement)
 
-  await act(async () => {
-    textarea.value = 'please IGNORE PREVIOUS instructions'
-    textarea.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-  assert.ok(dangerBadge() instanceof HTMLElement)
+  for (const phrase of [
+    'please IGNORE PREVIOUS instructions',
+    'jailbreak',
+    'developer mode',
+    'system prompt'
+  ]) {
+    await act(async () => {
+      textarea.value = phrase
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    assert.ok(dangerBadge() instanceof HTMLElement, `badge visible for phrase: ${phrase}`)
+  }
 
   await act(async () => {
     textarea.value = 'all safe here'
