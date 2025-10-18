@@ -4,6 +4,7 @@ import { writeText } from '@tauri-apps/api/clipboard'
 import { save } from '@tauri-apps/api/dialog'
 import { writeTextFile } from '@tauri-apps/api/fs'
 import './app.css'
+import { containsDangerWords } from './security/dangerWords'
 import { useOllamaStream } from './useOllamaStream'
 import KeybindOverlay, { resolveKeybindOverlayState } from './KeybindOverlay'
 import { containsDangerWord } from './security/dangerWords'
@@ -143,6 +144,7 @@ export default function App() {
   // 左右ペインのテキスト状態
   const [leftText, setLeftText]   = useState<string>('ここに入力。Ollama整形は右の▶で実行。')
   const [rightText, setRightText] = useState<string>('（ここに整形結果が出ます）')
+  const [hasDangerWords, setHasDangerWords] = useState<boolean>(false)
 
   // レシピ/モデル
   const [recipePath, setRecipePath] = useState('data/recipes/demo.sora2.yaml')
@@ -351,6 +353,10 @@ export default function App() {
     handleLeftSelection(e.currentTarget)
   }, [handleLeftSelection])
 
+  useEffect(() => {
+    setHasDangerWords(containsDangerWords(leftText))
+  }, [leftText])
+
   // --- Project file helpers ---
   const openProjectToLeft = useCallback(async () => {
     if (!projRel) return
@@ -533,6 +539,9 @@ export default function App() {
         </div>
 
         <div className="right-actions">
+          {hasDangerWords && (
+            <span className="badge" data-testid="danger-words-badge">⚠ 危険語を含む</span>
+          )}
           <label className="toolbar" style={{ gap: 6, alignItems: 'center' }}>
             <input type="checkbox" checked={sendSelectionOnly} onChange={e => setSendSelectionOnly(e.target.checked)} />
             <span>選択のみ送る</span>
