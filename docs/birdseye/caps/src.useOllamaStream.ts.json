@@ -1,0 +1,20 @@
+{
+  "id": "src/useOllamaStream.ts",
+  "role": "frontend-hook",
+  "summary": "Tauri のイベントバスと invoke API を束ね、Ollama ストリームの開始・停止・チャンク配送を UI へ伝える React フック。イベント購読の自動解放とエラー終端処理を内包し、同時実行を防ぎつつ abort_current_stream で中断を保証する。",
+  "public_api": [
+    "useOllamaStream(handlers)"
+  ],
+  "deps_in": [
+    "src/App.tsx",
+    "src/App.ui.test.tsx"
+  ],
+  "deps_out": [
+    "@tauri-apps/api/tauri",
+    "@tauri-apps/api/window",
+    "src/main.rs"
+  ],
+  "tests": [
+    "src/useOllamaStream.ts (inline vitest)"
+  ]
+}

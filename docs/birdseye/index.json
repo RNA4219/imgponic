@@ -1,26 +1,38 @@
 {
-  "generated_at": "2025-10-18T12:20:04Z",
+  "generated_at": "2025-10-18T13:36:07Z",
   "nodes": {
     "src/main.tsx": {
       "role": "frontend-entry",
       "caps": "docs/birdseye/caps/src.main.tsx.json",
-      "mtime": "2025-10-18T06:22:51Z"
+      "mtime": "2025-10-17T21:24:15Z"
     },
     "src/App.tsx": {
       "role": "ui-shell",
       "caps": "docs/birdseye/caps/src.App.tsx.json",
-      "mtime": "2025-10-18T12:18:24Z"
+      "mtime": "2025-10-18T07:42:39Z"
     },
     "src/main.rs": {
       "role": "backend-tauri",
       "caps": "docs/birdseye/caps/src.main.rs.json",
-      "mtime": "2025-10-18T12:18:24Z"
+      "mtime": "2025-10-18T09:54:31Z"
+    },
+    "src/useSetupCheck.ts": {
+      "role": "frontend-hook",
+      "caps": "docs/birdseye/caps/src.useSetupCheck.ts.json",
+      "mtime": "2025-10-18T10:47:34Z"
+    },
+    "src/useOllamaStream.ts": {
+      "role": "frontend-hook",
+      "caps": "docs/birdseye/caps/src.useOllamaStream.ts.json",
+      "mtime": "2025-10-18T05:06:18Z"
     }
   },
   "edges": [
     ["src/main.tsx", "src/App.tsx"],
-    ["src/App.tsx", "src/main.tsx"],
+    ["src/App.tsx", "src/useSetupCheck.ts"],
+    ["src/App.tsx", "src/useOllamaStream.ts"],
     ["src/App.tsx", "src/main.rs"],
-    ["src/main.rs", "src/App.tsx"]
+    ["src/useSetupCheck.ts", "src/main.rs"],
+    ["src/useOllamaStream.ts", "src/main.rs"]
   ]
 }

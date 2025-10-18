@@ -1,0 +1,22 @@
+{
+  "id": "src/useSetupCheck.ts",
+  "role": "frontend-hook",
+  "summary": "Ollama の起動状況とモデル有無を Tauri コマンド経由で確認し、UI 向けに正規化されたステータスとガイダンスを提供する React フック。初回マウント時と retry 実行時に check_ollama_setup を呼び出し、レスポンス形式の揺れや例外をオフライン扱いへ吸収する。",
+  "public_api": [
+    "useSetupCheck(currentModel)",
+    "SetupStatus",
+    "UseSetupCheckResult"
+  ],
+  "deps_in": [
+    "src/App.tsx",
+    "src/App.ui.test.tsx",
+    "src/useSetupCheck.test.ts"
+  ],
+  "deps_out": [
+    "@tauri-apps/api/tauri",
+    "src/main.rs"
+  ],
+  "tests": [
+    "src/useSetupCheck.test.ts"
+  ]
+}
