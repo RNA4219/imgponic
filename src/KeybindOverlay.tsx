@@ -45,7 +45,11 @@ const KeybindOverlay: React.FC<KeybindOverlayProps> = ({ open, onClose }) => {
         <header className="keybind-overlay__header">
           <h2 id="keybind-overlay-title">ショートカット早見表</h2>
           <p className="keybind-overlay__link">
-            <a href="./PromptForge_仕様書_v0.3_目次付き.md#ショートカット" target="_blank" rel="noreferrer">
+            <a
+              href="/docs/design/promptforge/PromptForge_仕様書_v0.3_目次付き.md#ショートカット"
+              target="_blank"
+              rel="noreferrer"
+            >
               仕様書: 主要ショートカット
             </a>
           </p>
