@@ -69,11 +69,14 @@ const getReactProps = (node: Element): Record<string, unknown> | null => {
   return (value && typeof value === 'object') ? (value as Record<string, unknown>) : null
 }
 
+const diffModule = await import('diff')
+
 const {
   default: App,
   composePromptWithSelection,
   createDiffPreviewFlow,
-  determineUserInput
+  determineUserInput,
+  buildUnifiedDiff
 } = await import('./App')
 
 const {
@@ -421,6 +424,32 @@ test('diff preview requires approval before applying', () => {
   expect(open).toBe(false)
   expect(left).toBe(right)
   expect(patches).toHaveLength(2)
+})
+
+test('buildUnifiedDiff delegates to diff library for unified patch', () => {
+  const sentinel = '--- sentinel diff ---'
+  const spy = vi.spyOn(diffModule, 'createTwoFilesPatch').mockReturnValue(sentinel)
+
+  try {
+    const result = buildUnifiedDiff('before\nline', 'after\nline')
+    expect(result).toBe(sentinel)
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy).toHaveBeenCalledWith('左', '右', 'before\nline', 'after\nline', '', '', { context: 3 })
+  } finally {
+    spy.mockRestore()
+  }
+})
+
+test('buildUnifiedDiff returns no-diff message when contents match', () => {
+  const spy = vi.spyOn(diffModule, 'createTwoFilesPatch')
+
+  try {
+    const result = buildUnifiedDiff('same line', 'same line')
+    expect(result).toBe(['--- 左', '+++ 右', '@@', '  (差分はありません)'].join('\n'))
+    expect(spy).not.toHaveBeenCalled()
+  } finally {
+    spy.mockRestore()
+  }
 })
 
 test('keybind overlay toggles on ? and closes on Esc', () => {

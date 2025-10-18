@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createTwoFilesPatch } from 'diff'
 import { invoke } from '@tauri-apps/api/core'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { save } from '@tauri-apps/plugin-dialog'
@@ -153,19 +154,10 @@ type DiffPreviewCallbacks = {
 }
 
 export const buildUnifiedDiff = (before: string, after: string): string => {
-  const header = '--- 左\n+++ 右\n@@'
-  if (before === after) return `${header}\n  (差分はありません)`
-  const beforeLines = before.split('\n')
-  const afterLines = after.split('\n')
-  const body = Array.from({ length: Math.max(beforeLines.length, afterLines.length) }, (_, idx) => {
-    const left = beforeLines[idx]
-    const right = afterLines[idx]
-    if (left === right) return ` ${left ?? ''}`
-    const minus = left !== undefined ? `-${left}` : ''
-    const plus = right !== undefined ? `+${right}` : ''
-    return [minus, plus].filter(Boolean).join('\n')
-  }).join('\n')
-  return `${header}\n${body}`
+  if (before === after) {
+    return ['--- 左', '+++ 右', '@@', '  (差分はありません)'].join('\n')
+  }
+  return createTwoFilesPatch('左', '右', before, after, '', '', { context: 3 })
 }
 
 export const createDiffPreviewFlow = (callbacks: DiffPreviewCallbacks) => ({
