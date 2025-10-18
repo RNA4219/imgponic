@@ -173,8 +173,6 @@ export default function App() {
   const [leftSelection, setLeftSelection] = useState<string>('')
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
-  const leftHasDangerWord = useMemo(() => containsDangerWord(leftText), [leftText])
-
   const { startStream, abortStream, isStreaming } = useOllamaStream({
     onChunk: chunk => setRightText(prev => prev + chunk),
     onEnd: () => setRunning(false),
