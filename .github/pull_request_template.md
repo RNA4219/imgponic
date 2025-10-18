@@ -1,11 +1,11 @@
 # Pull Request
 
-Intent: INT-___
+Intent ・ INT-000
 
 ## EVALUATION
 
 - [Acceptance Criteria](../EVALUATION.md#acceptance-criteria)
-- Priority Score: _
+- Priority Score: 0
 
 ## Summary
 
