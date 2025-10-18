@@ -39,14 +39,14 @@ const renderHook = async (model: string): Promise<RenderHookResult> => {
   }
 
   await act(async () => {
-    root.render(<TestComponent currentModel={model} />)
+    root.render(React.createElement(TestComponent, { currentModel: model }))
   })
 
   return {
     result,
     rerender: async nextModel => {
       await act(async () => {
-        root.render(<TestComponent currentModel={nextModel} />)
+        root.render(React.createElement(TestComponent, { currentModel: nextModel }))
       })
     },
     unmount: async () => {

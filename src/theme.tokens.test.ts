@@ -21,7 +21,7 @@ const tokens = [
 ];
 
 const escapeRegExp = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const getBlock = (selector: string): string => {
   const pattern = new RegExp(`${escapeRegExp(selector)}\\s*\\{[\\s\\S]*?\\}`, 'g');
