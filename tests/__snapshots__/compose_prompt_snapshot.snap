@@ -1,0 +1,12 @@
+---
+source: tests/compose_prompt_snapshot.rs
+expression: result.final_prompt
+---
+System instructions for PromptForge.
+Current date: 2024-01-01
+
+---
+USER_INPUT (verbatim):
+```text
+Please summarize the document.
+```

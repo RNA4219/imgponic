@@ -19,3 +19,7 @@ futures-util = "0.3"
 
 [build-dependencies]
 tauri-build = "1"
+
+[dev-dependencies]
+insta = "1"
+tempfile = "3"
