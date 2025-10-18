@@ -1,5 +1,4 @@
 [advisories]
-
-[[advisories.ignore]]
-id = "RUSTSEC-2024-0429"
-reason = "Upstream gtk3 stack still pinned to glib 0.15; tracked for upgrade once patched release is published."
+ignore = [
+    "RUSTSEC-2024-0429", # Upstream gtk3 stack still pinned to glib 0.15; tracked for upgrade once patched release is published.
+]
