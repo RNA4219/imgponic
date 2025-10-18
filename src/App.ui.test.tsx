@@ -1,47 +1,48 @@
-import assert from 'node:assert/strict'
+import { afterEach, expect, test, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import React from 'react'
+import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { act } from 'react-dom/test-utils'
-import { afterEach, test, vi } from 'vitest'
-
-let JSDOMClass: (typeof import('jsdom'))['JSDOM'] | null = null
-try {
-  ({ JSDOM: JSDOMClass } = await import('jsdom'))
-} catch {
-  JSDOMClass = null
-}
-
-const domInstance = JSDOMClass ? new JSDOMClass('<!doctype html><html><body></body></html>') : null
-const domAvailable = domInstance !== null
-const globalScope = globalThis as {
-  window?: typeof domInstance extends null ? Record<string, unknown> : typeof domInstance.window
-  document?: typeof domInstance extends null ? Record<string, unknown> : typeof domInstance.window.document
-  navigator?: typeof domInstance extends null ? Record<string, unknown> : typeof domInstance.window.navigator
-}
-
-if (domInstance && !globalScope.window) {
-  globalScope.window = domInstance.window
-  globalScope.document = domInstance.window.document
-  globalScope.navigator = domInstance.window.navigator
-}
-
-if (!domInstance) {
-  globalScope.window ??= {}
-  globalScope.document ??= {}
-  globalScope.navigator ??= {}
-}
 
 const streamModule = await import('./useOllamaStream')
 const setupModule = await import('./useSetupCheck')
 
 type UseSetupCheckFn = typeof setupModule.useSetupCheck
 type UseOllamaStreamFn = typeof streamModule.useOllamaStream
-type AppMocks = { useSetupCheck?: UseSetupCheckFn; useOllamaStream?: UseOllamaStreamFn }
+type AppMocks = {
+  useSetupCheck?: UseSetupCheckFn
+  useOllamaStream?: UseOllamaStreamFn
+  invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
+}
 const appMockContainer = globalThis as typeof globalThis & { __APP_MOCKS__?: AppMocks }
 
-const domTest = domAvailable ? test : test.skip
+const domTest = test
+
+const flushEffects = async () => {
+  await act(async () => {
+    await Promise.resolve()
+  })
+  await act(async () => {
+    await new Promise(resolve => setTimeout(resolve, 0))
+  })
+}
+
+const waitForElement = async <T extends Element>(query: () => T | null, label: string): Promise<T> => {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const element = query()
+    if (element) return element
+    await flushEffects()
+  }
+  throw new Error(`${label} not found`)
+}
+
+const getReactProps = (node: Element): Record<string, unknown> | null => {
+  const propsKey = Object.keys(node).find(key => key.startsWith('__reactProps$'))
+  if (!propsKey) return null
+  const record = node as unknown as Record<string, unknown>
+  const value = record[propsKey]
+  return (value && typeof value === 'object') ? (value as Record<string, unknown>) : null
+}
 
 const {
   default: App,
@@ -77,7 +78,15 @@ domTest('renders setup guidance banner when offline and retries on demand', asyn
     }),
     useOllamaStream: () => ({
       ...noopStream
-    })
+    }),
+    invoke: async (cmd: string) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
+    }
   }
 
   const container = document.body.appendChild(document.createElement('div'))
@@ -85,14 +94,15 @@ domTest('renders setup guidance banner when offline and retries on demand', asyn
   await act(async () => { root.render(<App />) })
 
   const banner = container.querySelector('[data-testid="setup-banner"]')
-  assert.ok(banner instanceof HTMLElement)
-  assert.ok(banner.textContent?.includes('Start Ollama'))
+  expect(banner).toBeInstanceOf(HTMLElement)
+  expect(banner?.textContent ?? '').toContain('Start Ollama')
 
   const retryButton = container.querySelector('[data-testid="setup-banner-retry"]')
-  assert.ok(retryButton instanceof HTMLButtonElement)
+  expect(retryButton).toBeInstanceOf(HTMLButtonElement)
+  if (!(retryButton instanceof HTMLButtonElement)) throw new Error('Expected retry button')
   await act(async () => { retryButton.click() })
 
-  assert.equal(retry.mock.calls.length, 1)
+  expect(retry).toHaveBeenCalledTimes(1)
 
   await act(async () => { root.unmount() })
   container.remove()
@@ -107,7 +117,15 @@ domTest('renders setup guidance banner when model is missing', async () => {
     }),
     useOllamaStream: () => ({
       ...noopStream
-    })
+    }),
+    invoke: async (cmd: string) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
+    }
   }
 
   const container = document.body.appendChild(document.createElement('div'))
@@ -115,8 +133,8 @@ domTest('renders setup guidance banner when model is missing', async () => {
   await act(async () => { root.render(<App />) })
 
   const banner = container.querySelector('[data-testid="setup-banner"]')
-  assert.ok(banner instanceof HTMLElement)
-  assert.ok(banner.textContent?.includes('Install recommended model'))
+  expect(banner).toBeInstanceOf(HTMLElement)
+  expect(banner?.textContent ?? '').toContain('Install recommended model')
 
   await act(async () => { root.unmount() })
   container.remove()
@@ -124,13 +142,13 @@ domTest('renders setup guidance banner when model is missing', async () => {
 
 domTest('renders ollama error banner and clears it on dismiss or retry', async () => {
   let capturedHandlers: Parameters<UseOllamaStreamFn>[0] | null = null
-  const consoleError = mock.method(console, 'error', () => {})
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({
       status: 'ready',
       guidance: '',
-      retry: mock.fn(async () => {})
+      retry: vi.fn(async () => {})
     }),
     useOllamaStream: handlers => {
       capturedHandlers = handlers
@@ -140,6 +158,14 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
         appendChunk: () => {},
         isStreaming: false
       }
+    },
+    invoke: async (cmd: string) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
     }
   }
 
@@ -150,33 +176,40 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
     await act(async () => { root.render(<App />) })
 
     const runButton = container.querySelector('.runpulse')
-    assert.ok(runButton instanceof HTMLButtonElement)
+    expect(runButton).toBeInstanceOf(HTMLButtonElement)
+    if (!(runButton instanceof HTMLButtonElement)) throw new Error('Expected run button')
 
     await act(async () => { runButton.click() })
 
-    assert.equal(container.querySelector('[role="alert"]'), null)
+    expect(container.querySelector('[role="alert"]')).toBeNull()
 
-    assert.ok(capturedHandlers)
+    expect(capturedHandlers).toBeTruthy()
     await act(async () => { capturedHandlers?.onError?.('Network unreachable') })
+    await flushEffects()
 
     const alert = container.querySelector('[role="alert"]')
-    assert.ok(alert instanceof HTMLElement)
-    assert.ok(alert.textContent?.includes('Network unreachable'))
-    assert.ok(consoleError.mock.calls.length > 0)
+    expect(alert).toBeInstanceOf(HTMLElement)
+    if (!(alert instanceof HTMLElement)) throw new Error('Expected alert element')
+    expect(alert?.textContent ?? '').toContain('Network unreachable')
+    expect(consoleError).toHaveBeenCalled()
 
     const dismissButton = alert.querySelector('[data-testid="ollama-error-dismiss"]')
-    assert.ok(dismissButton instanceof HTMLButtonElement)
+    expect(dismissButton).toBeInstanceOf(HTMLButtonElement)
+    if (!(dismissButton instanceof HTMLButtonElement)) throw new Error('Expected dismiss button')
     await act(async () => { dismissButton.click() })
+    await flushEffects()
 
-    assert.equal(container.querySelector('[role="alert"]'), null)
+    expect(container.querySelector('[role="alert"]')).toBeNull()
 
     await act(async () => { capturedHandlers?.onError?.('Network unreachable') })
-    assert.ok(container.querySelector('[role="alert"]'))
+    await flushEffects()
+    expect(container.querySelector('[role="alert"]')).not.toBeNull()
 
     await act(async () => { runButton.click() })
-    assert.equal(container.querySelector('[role="alert"]'), null)
+    await flushEffects()
+    expect(container.querySelector('[role="alert"]')).toBeNull()
   } finally {
-    consoleError.mock.restore()
+    consoleError.mockRestore()
     await act(async () => { root.unmount() })
     container.remove()
   }
@@ -187,13 +220,15 @@ test('determineUserInput returns selection context with line range header', () =
   const selection = 'line-6'
   const selectionStart = leftText.indexOf(selection)
   const result = determineUserInput(true, selection, leftText, selectionStart, selectionStart + selection.length, 3)
-  assert.ok(result.startsWith('[Lines 6-6]'))
-  assert.ok(result.includes('line-3') && result.includes('line-9') && result.includes(selection))
+  expect(result).toMatch(/^\[Lines 6-6]/)
+  expect(result).toContain('line-3')
+  expect(result).toContain('line-9')
+  expect(result).toContain(selection)
 })
 
 test('determineUserInput falls back to full text without selection', () => {
   const sample = 'a\nb\nc'
-  assert.equal(determineUserInput(false, '', sample, null, null, 3), sample)
+  expect(determineUserInput(false, '', sample, null, null, 3)).toBe(sample)
 })
 
 test('composePromptWithSelection masks sensitive text before invoking compose_prompt', async () => {
@@ -224,15 +259,16 @@ test('composePromptWithSelection masks sensitive text before invoking compose_pr
       sanitizedSnapshot = snapshot
     }
   })
-  assert.deepEqual(order, ['sanitize', 'invoke'])
-  assert.ok(sanitizedSnapshot)
-  assert.equal(sanitizedSnapshot?.raw.includes(sensitiveLine), true)
-  assert.equal(sanitizedSnapshot?.overLimit, false)
-  assert.deepEqual(sanitizedSnapshot?.maskedTypes, ['API_KEY'])
-  assert.equal(capturedUserInput.includes('<REDACTED:API_KEY>'), true)
-  assert.equal(capturedUserInput.includes('MySecretToken'), false)
-  assert.equal(capturedUserInput, sanitizedSnapshot?.sanitized)
-  assert.deepEqual(res, { final_prompt: 'fp', sha256: 'hash', model: 'model' })
+  expect(order).toEqual(['sanitize', 'invoke'])
+  expect(sanitizedSnapshot).not.toBeNull()
+  const snapshot = sanitizedSnapshot as NonNullable<typeof sanitizedSnapshot>
+  expect(snapshot.raw).toContain(sensitiveLine)
+  expect(snapshot.overLimit).toBe(false)
+  expect(snapshot.maskedTypes).toEqual(['API_KEY'])
+  expect(capturedUserInput).toContain('<REDACTED:API_KEY>')
+  expect(capturedUserInput).not.toContain('MySecretToken')
+  expect(capturedUserInput).toBe(snapshot.sanitized)
+  expect(res).toEqual({ final_prompt: 'fp', sha256: 'hash', model: 'model' })
 })
 
 test('diff preview requires approval before applying', () => {
@@ -257,20 +293,21 @@ test('diff preview requires approval before applying', () => {
   })
 
   flow.open()
-  assert.equal(open, true)
-  assert.equal(patches.length, 1)
-  assert.ok(patches[0].includes('-left') && patches[0].includes('+right'))
-  assert.equal(left, 'line1\nleft')
+  expect(open).toBe(true)
+  expect(patches).toHaveLength(1)
+  expect(patches[0]).toContain('-left')
+  expect(patches[0]).toContain('+right')
+  expect(left).toBe('line1\nleft')
 
   flow.cancel()
-  assert.equal(open, false)
-  assert.equal(left, 'line1\nleft')
+  expect(open).toBe(false)
+  expect(left).toBe('line1\nleft')
 
   flow.open()
   flow.confirm()
-  assert.equal(open, false)
-  assert.equal(left, right)
-  assert.equal(patches.length, 2)
+  expect(open).toBe(false)
+  expect(left).toBe(right)
+  expect(patches).toHaveLength(2)
 })
 
 test('keybind overlay toggles on ? and closes on Esc', () => {
@@ -286,38 +323,43 @@ test('keybind overlay toggles on ? and closes on Esc', () => {
 
   let state = false
   state = resolveKeybindOverlayState(state, baseEvent('?'))
-  assert.equal(state, true)
+  expect(state).toBe(true)
 
   state = resolveKeybindOverlayState(state, baseEvent('?'))
-  assert.equal(state, false)
+  expect(state).toBe(false)
 
   state = resolveKeybindOverlayState(true, baseEvent('Escape'))
-  assert.equal(state, false)
+  expect(state).toBe(false)
 
   state = resolveKeybindOverlayState(false, baseEvent('?', { ctrlKey: true }))
-  assert.equal(state, false)
+  expect(state).toBe(false)
 })
 
 test('keybind overlay lists primary shortcuts from spec link', () => {
   const markup = renderToStaticMarkup(<KeybindOverlay open onClose={() => {}} />)
   for (const shortcut of ['Ctrl/Cmd+Enter', 'Ctrl/Cmd+S', 'Ctrl/Cmd+C', '? / Esc']) {
-    assert.ok(markup.includes(shortcut))
+    expect(markup).toContain(shortcut)
   }
-  assert.ok(markup.includes('主要ショートカット'))
-  assert.deepEqual(
-    KEYBIND_SHORTCUTS.map(item => item.keys),
-    ['Ctrl/Cmd+Enter', 'Ctrl/Cmd+S', 'Ctrl/Cmd+C', '? / Esc']
-  )
+  expect(markup).toContain('主要ショートカット')
+  expect(KEYBIND_SHORTCUTS.map(item => item.keys)).toEqual([
+    'Ctrl/Cmd+Enter',
+    'Ctrl/Cmd+S',
+    'Ctrl/Cmd+C',
+    '? / Esc'
+  ])
 })
 
 domTest('loads corpus excerpt, injects into compose params, and renders preview metadata', async () => {
   const composeCalls: Array<Record<string, unknown>> = []
+  const excerptCalls: Array<Record<string, unknown>> = []
   appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),
     invoke: async (cmd: string, args?: Record<string, unknown>) => {
       if (cmd === 'read_workspace') return null
       if (cmd === 'write_workspace') return 'ok'
       if (cmd === 'load_txt_excerpt') {
-        assert.ok(args)
+        expect(args).toBeTruthy()
+        excerptCalls.push(args ?? {})
         return {
           path: String(args?.path ?? ''),
           excerpt: '頭 75% ... 尾 25%',
@@ -332,54 +374,6 @@ domTest('loads corpus excerpt, injects into compose params, and renders preview 
         return { final_prompt: 'prompt', sha256: 'hash', model: 'm' }
       }
       if (cmd === 'run_ollama_stream') return undefined
-      return undefined
-    },
-    useOllamaStream: () => ({
-      ...noopStream
-    })
-  }
-
-  const container = document.body.appendChild(document.createElement('div'))
-  const root = createRoot(container)
-  await act(async () => { root.render(<App />) })
-
-  const pathInput = container.querySelector('[data-testid="corpus-path-input"]')
-  assert.ok(pathInput instanceof HTMLInputElement)
-  await act(async () => {
-    pathInput.value = 'corpus/story.txt'
-    pathInput.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-
-  const loadButton = container.querySelector('[data-testid="load-excerpt-button"]')
-  assert.ok(loadButton instanceof HTMLButtonElement)
-  await act(async () => { loadButton.click() })
-  await act(async () => { await Promise.resolve() })
-
-  const preview = container.querySelector('[data-testid="excerpt-preview"]')
-  assert.ok(preview instanceof HTMLElement)
-  const previewText = preview.textContent ?? ''
-  assert.ok(previewText.includes('deadbeefcafebabe'))
-  assert.ok(previewText.includes('400 / 1200'))
-  assert.ok(previewText.toLowerCase().includes('truncated'))
-
-  const runButton = container.querySelector('.runpulse')
-  assert.ok(runButton instanceof HTMLButtonElement)
-  await act(async () => { runButton.click() })
-  await act(async () => { await Promise.resolve() })
-
-  assert.equal(composeCalls.length, 1)
-  const inlineParams = (composeCalls[0].inlineParams ?? {}) as Record<string, unknown>
-  assert.equal(inlineParams.doc_excerpt, '頭 75% ... 尾 25%')
-
-  await act(async () => { root.unmount() })
-  container.remove()
-})
-
-domTest('renders danger word badge only when left pane contains dangerous phrases', async () => {
-  appMockContainer.__APP_MOCKS__ = {
-    invoke: async (cmd: string) => {
-      if (cmd === 'read_workspace') return null
-      if (cmd === 'write_workspace') return 'ok'
       if (cmd === 'list_project_files') return []
       return undefined
     },
@@ -392,11 +386,84 @@ domTest('renders danger word badge only when left pane contains dangerous phrase
   const root = createRoot(container)
   await act(async () => { root.render(<App />) })
 
+  const pathInput = container.querySelector('[data-testid="corpus-path-input"]')
+  expect(pathInput).toBeInstanceOf(HTMLInputElement)
+  if (!(pathInput instanceof HTMLInputElement)) throw new Error('Expected path input')
+  const pathProps = getReactProps(pathInput)
+  const handlePathChange = pathProps?.onChange as ((event: unknown) => void) | undefined
+  expect(typeof handlePathChange).toBe('function')
+  await act(async () => {
+    await handlePathChange?.({
+      target: { value: 'corpus/story.txt' },
+      currentTarget: pathInput
+    })
+  })
+  await flushEffects()
+  expect(pathInput.value).toBe('corpus/story.txt')
+
+  const loadButton = container.querySelector('[data-testid="load-excerpt-button"]')
+  expect(loadButton).toBeInstanceOf(HTMLButtonElement)
+  if (!(loadButton instanceof HTMLButtonElement)) throw new Error('Expected load button')
+  loadButton.disabled = false
+  loadButton.removeAttribute('disabled')
+  const loadButtonProps = getReactProps(loadButton)
+  const handleClick = loadButtonProps?.onClick as ((event: unknown) => void) | undefined
+  expect(typeof handleClick).toBe('function')
+  await act(async () => {
+    await handleClick?.({ preventDefault() {}, stopPropagation() {} })
+  })
+  await flushEffects()
+  expect(excerptCalls).toHaveLength(1)
+
+  const preview = await waitForElement(
+    () => container.querySelector('[data-testid="excerpt-preview"]') as HTMLElement | null,
+    'excerpt preview'
+  )
+  const previewText = preview.textContent ?? ''
+  expect(previewText).toContain('deadbeefcafebabe')
+  expect(previewText).toContain('400 / 1200')
+  expect(previewText.toLowerCase()).toContain('truncated')
+
+  const runButton = container.querySelector('.runpulse')
+  expect(runButton).toBeInstanceOf(HTMLButtonElement)
+  if (!(runButton instanceof HTMLButtonElement)) throw new Error('Expected run button')
+  await act(async () => { runButton.click() })
+  await flushEffects()
+
+  expect(composeCalls).toHaveLength(1)
+  const inlineParams = (composeCalls[0].inlineParams ?? {}) as Record<string, unknown>
+  expect(inlineParams.doc_excerpt).toBe('頭 75% ... 尾 25%')
+
+  await act(async () => { root.unmount() })
+  container.remove()
+})
+
+domTest('renders danger word badge only when left pane contains dangerous phrases', async () => {
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),
+    invoke: async (cmd: string) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
+    },
+    useOllamaStream: () => ({
+      ...noopStream
+    })
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+  await act(async () => { root.render(<App />) })
+
   const dangerBadge = () => container.querySelector('[data-testid="danger-words-badge"]')
-  assert.equal(dangerBadge(), null)
+  expect(dangerBadge()).toBeNull()
 
   const textarea = container.querySelector('textarea[data-side="left"]')
-  assert.ok(textarea instanceof HTMLTextAreaElement)
+  expect(textarea).toBeInstanceOf(HTMLTextAreaElement)
+  if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Expected textarea')
 
   for (const phrase of [
     'please IGNORE PREVIOUS instructions',
@@ -405,17 +472,33 @@ domTest('renders danger word badge only when left pane contains dangerous phrase
     'system prompt'
   ]) {
     await act(async () => {
-      textarea.value = phrase
-      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+      const textProps = getReactProps(textarea)
+      const handleChange = textProps?.onChange as ((event: unknown) => void) | undefined
+      expect(typeof handleChange).toBe('function')
+      await handleChange?.({
+        target: { value: phrase },
+        currentTarget: textarea
+      })
     })
-    assert.ok(dangerBadge() instanceof HTMLElement, `badge visible for phrase: ${phrase}`)
+    await flushEffects()
+    const badge = await waitForElement(
+      () => dangerBadge() as HTMLElement | null,
+      'danger words badge'
+    )
+    expect(badge).toBeInstanceOf(HTMLElement)
   }
 
   await act(async () => {
-    textarea.value = 'all safe here'
-    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    const textProps = getReactProps(textarea)
+    const handleChange = textProps?.onChange as ((event: unknown) => void) | undefined
+    expect(typeof handleChange).toBe('function')
+    await handleChange?.({
+      target: { value: 'all safe here' },
+      currentTarget: textarea
+    })
   })
-  assert.equal(dangerBadge(), null)
+  await flushEffects()
+  expect(dangerBadge()).toBeNull()
 
   await act(async () => { root.unmount() })
   container.remove()
