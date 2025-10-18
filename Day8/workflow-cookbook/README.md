@@ -31,7 +31,8 @@ canary rules.
 - 言語・技術スタック非依存（存在するコマンドだけ使う）
 
 ## Repository structure
-```
+
+```text
 README.md                # この概要
 workflow-cookbook/docs/  # Birdseye カプセルほかドキュメント
 workflow-cookbook/governance/ # ポリシーとゲート設定
