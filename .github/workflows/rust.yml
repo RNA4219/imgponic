@@ -29,6 +29,8 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
       - name: Run cargo suite
         run: |
           set -Euo pipefail
@@ -58,6 +60,13 @@ jobs:
             log rust::audit pass $(( $(date +%s%3N)-start ))
           else
             log rust::audit fail $(( $(date +%s%3N)-start ))
+            if [ "${CI_STRICT:-}" = "true" ]; then overall=1; fi
+          fi
+          start=$(date +%s%3N)
+          if cargo deny check bans; then
+            log rust::deny pass $(( $(date +%s%3N)-start ))
+          else
+            log rust::deny fail $(( $(date +%s%3N)-start ))
             if [ "${CI_STRICT:-}" = "true" ]; then overall=1; fi
           fi
           exit $overall

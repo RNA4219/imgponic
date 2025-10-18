@@ -1,0 +1,11 @@
+[bans]
+
+[[bans.deny]]
+name = "glib"
+version = "< 0.20.0"
+reason = "GTK4 互換のため glib 0.20 以上を要求"
+
+[[bans.deny]]
+name = "gtk"
+version = "< 0.7.0"
+reason = "GTK4 系スタックへの移行に伴い gtk 0.7 以上を要求"
