@@ -426,6 +426,11 @@ struct Workspace {
     updated_at: String,
 }
 
+#[cfg(test)]
+pub mod workspace_test_support {
+    pub use super::{workspace_path, write_workspace, Workspace};
+}
+
 fn workspace_path(app: &tauri::AppHandle) -> PathBuf {
     if let Some(mut p) = app.path_resolver().app_data_dir() {
         p.push("workspace.json");
@@ -458,9 +463,20 @@ fn write_workspace(app: tauri::AppHandle, ws: Workspace) -> Result<String, Strin
     if let Some(dir) = p.parent() {
         fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
+    let backup_path = p.with_file_name("workspace.bak");
+    let mut warning: Option<String> = None;
+    if p.exists() {
+        if let Err(err) = fs::copy(&p, &backup_path) {
+            warning = Some(format!("failed to create workspace backup: {}", err));
+        }
+    }
     let s = serde_json::to_string_pretty(&ws).map_err(|e| e.to_string())?;
     fs::write(&p, s).map_err(|e| e.to_string())?;
-    Ok(p.display().to_string())
+    if let Some(warning) = warning {
+        Ok(format!("{} (warning: {})", p.display(), warning))
+    } else {
+        Ok(p.display().to_string())
+    }
 }
 
 fn main() {
