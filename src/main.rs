@@ -11,6 +11,7 @@ use chrono::Local;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::env;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -78,15 +79,20 @@ fn _compose_prompt(
     recipe_path: &str,
     inline_params: Option<serde_json::Value>,
 ) -> Result<ComposeResult> {
-    let rp = PathBuf::from(recipe_path);
-    let recipe: Recipe = read_yaml(&rp)?;
+    let sandbox = env::var_os("PROMPTFORGE_DATA_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("data"));
 
-    // base dir
-    let base = rp
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap_or_else(|| Path::new("."));
+    let rp_raw = PathBuf::from(recipe_path);
+    let rp = if rp_raw.is_absolute() || rp_raw.starts_with(&sandbox) {
+        rp_raw
+    } else {
+        sandbox.join(rp_raw)
+    };
+
+    ensure_under(&sandbox, &rp)?;
+
+    let recipe: Recipe = read_yaml(&rp)?;
 
     // merge params (inline override recipe.params)
     let mut params = recipe.params.clone();
@@ -102,9 +108,10 @@ fn _compose_prompt(
     // load fragments
     let mut blocks: Vec<String> = vec![];
     for frag_id in recipe.fragments.iter() {
-        let frag_path = base
+        let frag_path = sandbox
             .join("fragments")
             .join(format!("{}.yaml", frag_id.replace('.', "/")));
+        ensure_under(&sandbox, &frag_path)?;
         let frag: Fragment = read_yaml(&frag_path)
             .with_context(|| format!("Failed to read fragment: {}", frag_path.display()))?;
         let rendered = render_placeholders(&frag.content, &params);

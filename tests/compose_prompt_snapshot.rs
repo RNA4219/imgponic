@@ -1,11 +1,13 @@
 use std::fs;
 
-use promptforge::tests::_compose_prompt;
+use promptforge::tests::{DataDirGuard, _compose_prompt};
 
 #[test]
 fn compose_prompt_snapshot() {
     let temp = tempfile::tempdir().expect("failed to create temp dir");
     let base = temp.path();
+
+    let _guard = DataDirGuard::set(base);
 
     let recipes_dir = base.join("recipes");
     let fragments_dir = base.join("fragments/system");
