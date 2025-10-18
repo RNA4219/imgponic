@@ -1,11 +1,11 @@
 {
   "id": "src/security/dangerWords.ts",
   "role": "security-lexicon",
-  "summary": "入力文字列を危険ワードリストと照合し、脱走指示やガードレール回避意図を事前検知する軽量ユーティリティ。文中に既知フレーズが含まれるかを小文字比較で高速判定する。",
+  "summary": "LLM入力に含まれる脱走指示やシステム破り語句を小文字比較で検知し、危険なプロンプト送信を抑止する語彙リストとユーティリティ。ガードレール回避フレーズを手動管理し、判定は同期処理で副作用を持たない。",
   "public_api": [
-    "DANGER_WORDS",
-    "containsDangerWords(input)",
-    "containsDangerWord(input)"
+    "DANGER_WORDS: ReadonlyArray<string>",
+    "containsDangerWords(input: string): boolean",
+    "containsDangerWord(input: string): boolean"
   ],
   "deps_in": [
     "src/App.tsx"

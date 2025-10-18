@@ -1,9 +1,9 @@
 {
   "id": "src/security/sanitizeUserInput.ts",
   "role": "security-sanitizer",
-  "summary": "LLM 送信前のユーザー入力から既知の資格情報パターンをマスクし、上限長を判定するユーティリティ。API キーや PEM を正規表現で置換し、マスク対象の種類と超過フラグを返す。",
+  "summary": "ユーザー入力の長さと資格情報漏洩を検査し、既知のAPIキーやPEM鍵パターンをマスクした上で送信可否を判断する同期ユーティリティ。しきい値超過時は原文を保持し、マスク種別の一覧を返す。",
   "public_api": [
-    "sanitizeUserInput(text)",
+    "sanitizeUserInput(text: string): SanitizedUserInput",
     "SanitizedUserInput"
   ],
   "deps_in": [
