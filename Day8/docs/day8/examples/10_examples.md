@@ -1,6 +1,7 @@
 # サンプル
 
 ## test.yml（サブディレクトリ対応）
+
 ```yaml
 name: test
 on:
@@ -28,6 +29,7 @@ jobs:
 ```
 
 ## reflection.yml（連動）
+
 ```yaml
 name: reflection
 on:
@@ -72,10 +74,12 @@ jobs:
           git config user.name "reflect-bot"
           git config user.email "bot@example.com"
           git add workflow-cookbook/reports/today.md
-          git commit -m "chore(report): reflection report [skip ci]" || echo "no changes"
+          git commit -m "chore(report): reflection report [skip ci]" \
+            || echo "no changes"
           git push || true
 ```
 
 ## analyze.py（骨子）
+
 - JSONLを読み、合格率・p95・失敗数を算出
 - Why-Why 草案と Issue 候補を出力

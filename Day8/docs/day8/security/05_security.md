@@ -1,6 +1,7 @@
 # セキュリティ & ガバナンス
 
 ## ポリシー（例）
+
 ```yaml
 # governance/policy.yaml（例）
 owners: ["@RNA4219"]
@@ -23,5 +24,6 @@ protected_paths:
 ```
 
 ## PII/機微情報の取り扱い
+
 - ログ収集時にマスキングを適用
 - 外部送信は行わない
