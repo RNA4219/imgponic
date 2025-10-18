@@ -39,3 +39,11 @@ flowchart LR
 ## 6. Interfaces
 
 - CLI/API/Files（エンドポイント/パス命名）
+
+---
+
+## Incident References
+
+- 運用中の実例: [`docs/IN-20250215-001.md`](../../docs/IN-20250215-001.md)
+- 想定シナリオ: [`docs/IN-20250310-001.md`](../../docs/IN-20250310-001.md)
+- テンプレート: [`docs/INCIDENT_TEMPLATE.md`](../../docs/INCIDENT_TEMPLATE.md)

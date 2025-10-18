@@ -134,9 +134,9 @@ docs/           # 仕様/設計/配色ほか
 
 ## 🚨 インシデント対応フロー
 
-1. `docs/INCIDENT_TEMPLATE.md` をコピーし、`docs/IN-YYYYMMDD-XXX.md`（例: [IN-20250215-001](docs/IN-20250215-001.md)）として保存。
-2. 検知・影響・5Whys・再発防止・タイムラインを Runbook/Evaluation の要件に沿って記入。
-3. 対応完了後は関連PRと RUNBOOK/EVALUATION へ相互リンクを追加し、Preventive Actions の追跡Issueを更新。
+1. `docs/INCIDENT_TEMPLATE.md` をコピーし、`docs/IN-YYYYMMDD-XXX.md`（例: [IN-20250215-001](docs/IN-20250215-001.md)、想定: [IN-20250310-001](docs/IN-20250310-001.md)）として保存。
+2. 検知・影響・5Whys・再発防止・タイムラインを Runbook/Evaluation の要件に沿って記入し、各節に Blueprint/Evaluation の該当リンクを差し込む。
+3. 対応完了後は関連PRと RUNBOOK/EVALUATION へ相互リンクを追加し、Preventive Actions の追跡Issueを更新して README の運用例を最新化。
 
 ---
 
