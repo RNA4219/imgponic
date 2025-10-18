@@ -4,6 +4,7 @@ import { writeText } from '@tauri-apps/api/clipboard'
 import { save } from '@tauri-apps/api/dialog'
 import { writeTextFile } from '@tauri-apps/api/fs'
 import './app.css'
+import { useOllamaStream } from './useOllamaStream'
 
 export type ComposeResult = { final_prompt: string; sha256: string; model: string }
 type InvokeFunction = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
@@ -98,6 +99,20 @@ export default function App() {
   const [sendSelectionOnly, setSendSelectionOnly] = useState<boolean>(false)
   const [leftSelection, setLeftSelection] = useState<string>('')
 
+  const { startStream, abortStream, isStreaming } = useOllamaStream({
+    onChunk: chunk => setRightText(prev => prev + chunk),
+    onEnd: () => setRunning(false),
+    onError: () => setRunning(false)
+  })
+
+  useEffect(() => {
+    if (running) {
+      runBtnRef.current?.classList.add('active')
+    } else {
+      runBtnRef.current?.classList.remove('active')
+    }
+  }, [running])
+
   // プロジェクトファイルパス（project/ 内相対）
   const [projRel, setProjRel] = useState('src/example.py')
 
@@ -168,8 +183,9 @@ export default function App() {
 
   // 実行（▶）
   const runOllama = useCallback(async () => {
+    if (isStreaming) return
     setRunning(true)
-    runBtnRef.current?.classList.add('active')
+    setRightText('')
     try {
       const c = composed ?? await doCompose()
       const sep = '\n---\nUSER_INPUT'
@@ -177,17 +193,16 @@ export default function App() {
       const sys = at < 0 ? c.final_prompt : c.final_prompt.slice(0, at)
       const user = at < 0 ? '' : c.final_prompt.slice(at)
 
-      const res = await invoke('run_ollama_chat', {
+      await startStream({
         model: ollamaModel,
         systemText: sys,
         userText: user
       })
-      setRightText(res as string)
-    } finally {
-      setTimeout(() => runBtnRef.current?.classList.remove('active'), 120)
+    } catch (error) {
+      console.error('run ollama stream failed', error)
       setRunning(false)
     }
-  }, [composed, doCompose, ollamaModel])
+  }, [isStreaming, composed, doCompose, startStream, ollamaModel])
 
   // 右→左 反映（プレビュー付き）
   const diffFlow = useMemo(() => createDiffPreviewFlow({ readLeft: () => leftText, readRight: () => rightText, show: value => setDiffPatch(value), apply: value => setLeftText(value), close: () => setDiffPatch(null) }), [leftText, rightText])
@@ -314,7 +329,9 @@ export default function App() {
             <span className="badge">{formatSelectionSummary(sendSelectionOnly, leftSelection, leftText)}</span>
           </label>
           {composed && <div className="badge">SHA-256: {composed.sha256.slice(0,16)}…</div>}
-          <button ref={runBtnRef} className={`btn primary runpulse ${running ? 'active' : ''}`} onClick={runOllama} disabled={running}>
+          {isStreaming && <span>Streaming...</span>}
+          <button className="btn" onClick={abortStream} disabled={!isStreaming}>停止</button>
+          <button ref={runBtnRef} className={`btn primary runpulse ${running ? 'active' : ''}`} onClick={runOllama} disabled={isStreaming}>
             ▶ 実行（Ctrl/Cmd+Enter）
           </button>
         </div>
