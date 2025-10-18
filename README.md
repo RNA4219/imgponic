@@ -7,9 +7,19 @@ next_review_due: 2025-04-01
 ---
 
 
+<!-- LLM-BOOTSTRAP v1 -->
+読む順番:
+1. [docs/birdseye/index.json](docs/birdseye/index.json) …… ノード一覧と隣接関係の軽量マップ。
+2. [docs/birdseye/caps/src.App.tsx.json](docs/birdseye/caps/src.App.tsx.json) など対象ノードのカプセルを順に参照。
+
+フォーカス手順:
+- 変更予定ファイル±2 hop のノードIDを index.json から取得。
+- 対応する caps/*.json のみ読み込み、summary/public_api を確認。
+<!-- /LLM-BOOTSTRAP -->
+
 <!-- markdownlint-disable-next-line MD022 -->
 # Imgponic — 想像を育てるプロンプト温室
-**Version:** 1.0.0  
+**Version:** 1.0.0
 **License:** MIT  
 **Theme:** main `#C4FCC4` / background `#FFFFEE`
 
