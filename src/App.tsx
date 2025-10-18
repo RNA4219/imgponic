@@ -194,6 +194,10 @@ export default function App() {
   // パラメータ
   const [params, setParams] = useState({ goal: '30秒の戦闘シーン', tone: '冷静', steps: 6, user_input: '' })
   const [composed, setComposed] = useState<ComposeResult | null>(null)
+  const composedRef = useRef<ComposeResult | null>(composed)
+  useEffect(() => {
+    composedRef.current = composed
+  }, [composed])
   const [diffPatch, setDiffPatch] = useState<string | null>(null)
   const [showKeybindOverlay, setShowKeybindOverlay] = useState(false)
 
@@ -220,7 +224,7 @@ export default function App() {
     onError: message => {
       console.error('ollama stream error', message)
       setRunning(false)
-      setOllamaError(describeOllamaError(message))
+      clearStreamedResponse()
     }
   })
   const abortStream = useCallback(async () => {
@@ -380,6 +384,7 @@ export default function App() {
     resetOllamaError()
     setRunning(true)
     setRightText('')
+    clearStreamedResponse()
     try {
       const c = composed ?? await doCompose()
       const sep = '\n---\nUSER_INPUT'
@@ -397,7 +402,7 @@ export default function App() {
       setRunning(false)
       setOllamaError(describeOllamaError(error))
     }
-  }, [isStreaming, resetOllamaError, composed, doCompose, startStream, ollamaModel])
+  }, [isStreaming, composed, doCompose, startStream, ollamaModel, clearStreamedResponse])
 
   // 右→左 反映（プレビュー付き）
   const diffFlow = useMemo(
