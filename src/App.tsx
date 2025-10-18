@@ -5,6 +5,7 @@ import { save } from '@tauri-apps/api/dialog'
 import { writeTextFile } from '@tauri-apps/api/fs'
 import './app.css'
 import { useOllamaStream } from './useOllamaStream'
+import KeybindOverlay, { resolveKeybindOverlayState } from './KeybindOverlay'
 
 export type ComposeResult = { final_prompt: string; sha256: string; model: string }
 type InvokeFunction = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
@@ -141,6 +142,7 @@ export default function App() {
   const [params, setParams] = useState({ goal: '30秒の戦闘シーン', tone: '冷静', steps: 6, user_input: '' })
   const [composed, setComposed] = useState<ComposeResult | null>(null)
   const [diffPatch, setDiffPatch] = useState<string | null>(null)
+  const [showKeybindOverlay, setShowKeybindOverlay] = useState(false)
 
   // 実行ボタン演出
   const [running, setRunning] = useState(false)
@@ -357,6 +359,14 @@ export default function App() {
         e.preventDefault()
         copy(rightText)
       }
+
+      let preventOverlayToggle = false
+      setShowKeybindOverlay(prev => {
+        const next = resolveKeybindOverlayState(prev, e)
+        if (next !== prev) preventOverlayToggle = true
+        return next
+      })
+      if (preventOverlayToggle) e.preventDefault()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -468,6 +478,8 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      <KeybindOverlay open={showKeybindOverlay} onClose={() => setShowKeybindOverlay(false)} />
 
       {diffPatch && (
         <div className="diff-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

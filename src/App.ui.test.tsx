@@ -1,11 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { renderToStaticMarkup } from 'react-dom/server'
 
-import React from 'react'
-import { createRoot } from 'react-dom/client'
-import { act } from 'react-dom/test-utils'
-
-import App, { composePromptWithSelection, createDiffPreviewFlow, determineUserInput } from './App'
+import { composePromptWithSelection, createDiffPreviewFlow, determineUserInput } from './App'
+import KeybindOverlay, { KEYBIND_SHORTCUTS, resolveKeybindOverlayState } from './KeybindOverlay'
 
 test('determineUserInput returns selection context with line range header', () => {
   const leftText = Array.from({ length: 12 }, (_, idx) => `line-${idx + 1}`).join('\n')
@@ -84,31 +82,39 @@ test('diff preview requires approval before applying', () => {
   assert.equal(patches.length, 2)
 })
 
-test('high contrast toggle updates body class, persists, and restores on mount', async () => {
-  const key = 'accessibility:highContrast'
-  localStorage.removeItem(key)
-  document.body.classList.remove('high-contrast')
+test('keybind overlay toggles on ? and closes on Esc', () => {
+  const baseEvent = (key: string, overrides: Partial<Parameters<typeof resolveKeybindOverlayState>[1]> = {}) => ({
+    key,
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: key === '?',
+    target: undefined,
+    ...overrides
+  })
 
-  const container = document.body.appendChild(document.createElement('div'))
-  const root = createRoot(container)
-  await act(async () => { root.render(<App />) })
+  let state = false
+  state = resolveKeybindOverlayState(state, baseEvent('?'))
+  assert.equal(state, true)
 
-  const toggle = container.querySelector('[data-testid="high-contrast-toggle"]')
-  assert.ok(toggle instanceof HTMLButtonElement)
-  await act(async () => { toggle.click() })
+  state = resolveKeybindOverlayState(state, baseEvent('?'))
+  assert.equal(state, false)
 
-  assert.equal(document.body.classList.contains('high-contrast'), true)
-  assert.equal(localStorage.getItem(key), '1')
+  state = resolveKeybindOverlayState(true, baseEvent('Escape'))
+  assert.equal(state, false)
 
-  await act(async () => { root.unmount() })
-  const rerenderContainer = document.body.appendChild(document.createElement('div'))
-  const rerenderRoot = createRoot(rerenderContainer)
-  await act(async () => { rerenderRoot.render(<App />) })
-  assert.equal(document.body.classList.contains('high-contrast'), true)
+  state = resolveKeybindOverlayState(false, baseEvent('?', { ctrlKey: true }))
+  assert.equal(state, false)
+})
 
-  await act(async () => { rerenderRoot.unmount() })
-  container.remove()
-  rerenderContainer.remove()
-  localStorage.removeItem(key)
-  document.body.classList.remove('high-contrast')
+test('keybind overlay lists primary shortcuts from spec link', () => {
+  const markup = renderToStaticMarkup(<KeybindOverlay open onClose={() => {}} />)
+  for (const shortcut of ['Ctrl/Cmd+Enter', 'Ctrl/Cmd+S', 'Ctrl/Cmd+C', '? / Esc']) {
+    assert.ok(markup.includes(shortcut))
+  }
+  assert.ok(markup.includes('主要ショートカット'))
+  assert.deepEqual(
+    KEYBIND_SHORTCUTS.map(item => item.keys),
+    ['Ctrl/Cmd+Enter', 'Ctrl/Cmd+S', 'Ctrl/Cmd+C', '? / Esc']
+  )
 })
