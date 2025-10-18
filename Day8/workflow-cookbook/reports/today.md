@@ -7,4 +7,5 @@
 - Failures: 1
 
 ## Why-Why (draft)
+
 - sample::fail (x1): 仮説=前処理の不安定/依存の競合/境界値不足
