@@ -18,14 +18,12 @@ Imgponic は、**プロンプトとコードを“育てる”ためのローカ
 <!-- LLM-BOOTSTRAP v1 -->
 
 読む順番:
-
-1. [docs/birdseye/index.json](docs/birdseye/index.json) …… ノード一覧と隣接関係の軽量マップ。
-2. [docs/birdseye/caps/src.App.tsx.json](docs/birdseye/caps/src.App.tsx.json) など対象ノードのカプセルを順に参照。
+1. docs/birdseye/index.json …… ノード一覧・隣接関係（軽量）
+2. docs/birdseye/caps/<path>.json …… 必要ノードだけ point read（個別カプセル）
 
 フォーカス手順:
-
-- 変更予定ファイル±2 hop のノードIDを index.json から取得。
-- 対応する caps/*.json のみ読み込み、summary/public_api を確認。
+- 直近変更ファイル±2hopのノードIDを index.json から取得
+- 対応する caps/*.json のみ読み込み
 <!-- /LLM-BOOTSTRAP -->
 
 ---
