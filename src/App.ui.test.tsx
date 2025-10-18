@@ -1,18 +1,188 @@
 import { JSDOM } from 'jsdom'
-import { afterAll, afterEach, expect, test, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 
-const domInstance = new JSDOM('<!DOCTYPE html><html><body></body></html>')
+type VitestModule = typeof import('vitest')
+type NodeAssertModule = typeof import('node:assert/strict')
+
+type MockRecord = { calls: unknown[][]; results: Array<{ type: 'return' | 'throw'; value: unknown }> }
+type MockFunction = ((...args: unknown[]) => unknown) & {
+  mock: MockRecord
+  mockImplementation(nextImpl: (...args: unknown[]) => unknown): MockFunction
+  mockReturnValue(value: unknown): MockFunction
+  mockResolvedValue(value: unknown): MockFunction
+  mockRejectedValue(reason: unknown): MockFunction
+  mockRestore(): void
+  mockClear(): MockFunction
+}
+
+type MinimalVi = {
+  fn(implementation?: (...args: unknown[]) => unknown): MockFunction
+  spyOn<T extends object, K extends keyof T>(target: T, property: K): MockFunction
+}
+
+const createNodeHarness = (assert: NodeAssertModule): { expect: VitestModule['expect']; vi: MinimalVi } => {
+  const createMockFunction = (implementation: (...args: unknown[]) => unknown, restore?: () => void): MockFunction => {
+    let currentImpl = implementation
+    const mockFn: Partial<MockFunction> = function (this: unknown, ...args: unknown[]) {
+      const record = mockFn.mock as MockRecord
+      record.calls.push(args)
+      try {
+        const value = currentImpl.apply(this, args)
+        record.results.push({ type: 'return', value })
+        return value
+      } catch (error) {
+        record.results.push({ type: 'throw', value: error })
+        throw error
+      }
+    }
+    mockFn.mock = { calls: [], results: [] }
+    const setImpl = (nextImpl: (...args: unknown[]) => unknown): MockFunction => {
+      currentImpl = nextImpl
+      return mockFn as MockFunction
+    }
+    mockFn.mockImplementation = (nextImpl: (...args: unknown[]) => unknown) => setImpl(nextImpl)
+    mockFn.mockReturnValue = (value: unknown) => setImpl(() => value)
+    mockFn.mockResolvedValue = (value: unknown) => setImpl(async () => value)
+    mockFn.mockRejectedValue = (reason: unknown) =>
+      setImpl(async () => {
+        throw reason
+      })
+    mockFn.mockClear = () => {
+      mockFn.mock.calls.length = 0
+      mockFn.mock.results.length = 0
+      return mockFn as MockFunction
+    }
+    mockFn.mockRestore = () => {
+      mockFn.mockClear()
+      setImpl(implementation)
+      restore?.()
+    }
+    return mockFn as MockFunction
+  }
+
+  const vi: MinimalVi = {
+    fn: (implementation?: (...args: unknown[]) => unknown) =>
+      createMockFunction(implementation ?? (() => undefined)),
+    spyOn: <T extends object, K extends keyof T>(target: T, property: K) => {
+      const descriptor = Object.getOwnPropertyDescriptor(target, property)
+      if (!descriptor || typeof descriptor.value !== 'function') {
+        throw new Error('spyOn only supports existing function properties')
+      }
+      const original = descriptor.value as (...args: unknown[]) => unknown
+      const mockFn = createMockFunction(function (this: unknown, ...args: unknown[]) {
+        return original.apply(this, args)
+      }, () => {
+        Object.defineProperty(target, property, descriptor)
+      })
+      Object.defineProperty(target, property, {
+        ...descriptor,
+        value: mockFn
+      })
+      return mockFn
+    }
+  }
+
+  const isArray = Array.isArray
+  const ensureMock = (value: unknown): MockFunction => {
+    if (typeof value !== 'function' || !value || !(value as MockFunction).mock) {
+      throw new Error('Expected a mock function')
+    }
+    return value as MockFunction
+  }
+
+  const expectImpl: VitestModule['expect'] = actual => {
+    const build = (negate: boolean) => ({
+      toBe(expected: unknown) {
+        return negate ? assert.notStrictEqual(actual, expected) : assert.strictEqual(actual, expected)
+      },
+      toEqual(expected: unknown) {
+        return negate ? assert.notDeepStrictEqual(actual, expected) : assert.deepStrictEqual(actual, expected)
+      },
+      toContain(expected: unknown) {
+        const result =
+          typeof actual === 'string'
+            ? actual.includes(String(expected))
+            : isArray(actual)
+              ? actual.includes(expected)
+              : false
+        return negate ? assert.ok(!result) : assert.ok(result)
+      },
+      toMatch(expected: RegExp | string) {
+        const pattern = typeof expected === 'string' ? new RegExp(expected) : expected
+        const match = pattern.test(String(actual))
+        return negate ? assert.ok(!match) : assert.ok(match)
+      },
+      toBeInstanceOf(expected: new (...args: unknown[]) => unknown) {
+        const outcome = actual instanceof expected
+        return negate ? assert.ok(!outcome) : assert.ok(outcome)
+      },
+      toBeNull() {
+        return negate ? assert.notStrictEqual(actual, null) : assert.strictEqual(actual, null)
+      },
+      toBeTruthy() {
+        return negate ? assert.ok(!actual) : assert.ok(actual)
+      },
+      toHaveBeenCalled() {
+        const mock = ensureMock(actual)
+        const outcome = mock.mock.calls.length > 0
+        return negate ? assert.ok(!outcome) : assert.ok(outcome)
+      },
+      toHaveBeenCalledTimes(expected: number) {
+        const mock = ensureMock(actual)
+        return negate
+          ? assert.notStrictEqual(mock.mock.calls.length, expected)
+          : assert.strictEqual(mock.mock.calls.length, expected)
+      },
+      toHaveLength(expected: number) {
+        const length = (actual as { length?: number }).length
+        if (typeof length !== 'number') {
+          throw new Error('Expected value with a length property')
+        }
+        return negate ? assert.notStrictEqual(length, expected) : assert.strictEqual(length, expected)
+      }
+    })
+
+    const matchers = build(false)
+    return Object.assign(matchers, { not: build(true) }) as ReturnType<VitestModule['expect']>
+  }
+
+  return { expect: expectImpl, vi }
+}
+
+let afterAll: VitestModule['afterAll']
+let afterEach: VitestModule['afterEach']
+let expect: VitestModule['expect']
+let test: VitestModule['test']
+let vi: VitestModule['vi']
+
+try {
+  const vitest = await import('vitest')
+  ;({ afterAll, afterEach, expect, test, vi } = vitest)
+} catch {
+  const nodeTest = await import('node:test')
+  const assertModule = await import('node:assert/strict')
+  const harness = createNodeHarness(assertModule)
+  afterAll = nodeTest.after as VitestModule['afterAll']
+  afterEach = nodeTest.afterEach as VitestModule['afterEach']
+  test = nodeTest.test as VitestModule['test']
+  expect = harness.expect
+  vi = harness.vi as unknown as VitestModule['vi']
+}
+
+const domInstance = new JSDOM('<!DOCTYPE html><html><body></body></html>', { url: 'https://example.test' })
 
 if (!globalThis.window) {
   const { window } = domInstance
   const { document, navigator } = window
 
   Object.assign(globalThis, { window, document, navigator })
-  Object.assign(globalThis, window)
+  for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(window))) {
+    if (key in globalThis || !descriptor) continue
+    Object.defineProperty(globalThis, key, descriptor)
+  }
 
   const constructorKeys: Array<'HTMLElement' | 'HTMLButtonElement' | 'HTMLInputElement' | 'HTMLTextAreaElement'> = [
     'HTMLElement',
@@ -216,9 +386,11 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
     await act(async () => { capturedHandlers?.onError?.('Network unreachable') })
     await flushEffects()
 
-    const alert = container.querySelector('[role="alert"]')
+    const alert = await waitForElement(
+      () => container.querySelector('[role="alert"]') as HTMLElement | null,
+      'ollama error banner'
+    )
     expect(alert).toBeInstanceOf(HTMLElement)
-    if (!(alert instanceof HTMLElement)) throw new Error('Expected alert element')
     expect(alert?.textContent ?? '').toContain('Network unreachable')
     expect(consoleError).toHaveBeenCalled()
 
@@ -232,7 +404,11 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
 
     await act(async () => { capturedHandlers?.onError?.('Network unreachable') })
     await flushEffects()
-    expect(container.querySelector('[role="alert"]')).not.toBeNull()
+    const reopened = await waitForElement(
+      () => container.querySelector('[role="alert"]') as HTMLElement | null,
+      'ollama error banner'
+    )
+    expect(reopened).toBeInstanceOf(HTMLElement)
 
     await act(async () => { runButton.click() })
     await flushEffects()
@@ -382,6 +558,39 @@ test('composePromptWithSelection masks sensitive text before invoking compose_pr
   expect(capturedUserInput).not.toContain('MySecretToken')
   expect(capturedUserInput).toBe(snapshot.sanitized)
   expect(res).toEqual({ final_prompt: 'fp', sha256: 'hash', model: 'model' })
+})
+
+test('composePromptWithSelection uses masked text when sanitizeUserInput reports overLimit', async () => {
+  const secret = 'AKIA1234567890ABCDEF'
+  const filler = 'x'.repeat(40000)
+  const raw = `${filler}${secret}`
+  let capturedUserInput = ''
+  let sanitizedSnapshot: { sanitized: string; maskedTypes: string[]; overLimit: boolean; raw: string } | null = null
+  await composePromptWithSelection({
+    invokeFn: async (_cmd, args) => {
+      capturedUserInput = String((args?.inlineParams as { user_input: string }).user_input)
+      return { final_prompt: 'fp', sha256: 'hash', model: 'model' }
+    },
+    params: {},
+    recipePath: 'recipe.yaml',
+    leftText: raw,
+    sendSelectionOnly: false,
+    selection: '',
+    selectionStart: null,
+    selectionEnd: null,
+    contextRadius: 3,
+    onSanitized: snapshot => {
+      sanitizedSnapshot = snapshot
+    }
+  })
+  expect(sanitizedSnapshot).not.toBeNull()
+  const snapshot = sanitizedSnapshot as NonNullable<typeof sanitizedSnapshot>
+  expect(snapshot.overLimit).toBe(true)
+  expect(snapshot.sanitized).toContain('<REDACTED:')
+  expect(snapshot.raw).toBe(raw)
+  expect(snapshot.maskedTypes).toEqual(['AWS_ACCESS_KEY'])
+  expect(capturedUserInput).toBe(snapshot.sanitized)
+  expect(capturedUserInput).not.toContain(secret)
 })
 
 test('diff preview requires approval before applying', () => {
@@ -648,20 +857,20 @@ domTest('saves stream results once the stream completes', async () => {
   await act(async () => { root.render(<App />) })
 
   const runButton = container.querySelector('.runpulse')
-  assert.ok(runButton instanceof HTMLButtonElement)
+  expect(runButton).toBeInstanceOf(HTMLButtonElement)
   await act(async () => { runButton.click() })
   await act(async () => { await Promise.resolve() })
   await act(async () => { await Promise.resolve() })
 
-  assert.equal(saveRunCalls.length, 1)
+  expect(saveRunCalls).toHaveLength(1)
   const saveArgs = saveRunCalls[0] as { recipePath?: string; final_prompt?: string; response_text?: string }
-  assert.equal(saveArgs.recipePath, 'data/recipes/demo.sora2.yaml')
-  assert.equal(saveArgs.final_prompt, 'SYS\n---\nUSER_INPUT final')
-  assert.equal(saveArgs.response_text, 'first second')
+  expect(saveArgs.recipePath).toBe('data/recipes/demo.sora2.yaml')
+  expect(saveArgs.final_prompt).toBe('SYS\n---\nUSER_INPUT final')
+  expect(saveArgs.response_text).toBe('first second')
 
   const rightTextarea = container.querySelector('textarea[data-side="right"]')
-  assert.ok(rightTextarea instanceof HTMLTextAreaElement)
-  assert.equal(rightTextarea.value, 'first second')
+  expect(rightTextarea).toBeInstanceOf(HTMLTextAreaElement)
+  expect(rightTextarea?.value).toBe('first second')
 
   await act(async () => { root.unmount() })
   container.remove()
@@ -711,27 +920,27 @@ domTest('clears accumulated stream text after aborts and errors', async () => {
   await act(async () => { root.render(<App />) })
 
   const runButton = container.querySelector('.runpulse')
-  assert.ok(runButton instanceof HTMLButtonElement)
+  expect(runButton).toBeInstanceOf(HTMLButtonElement)
 
   await act(async () => { runButton.click() })
   await act(async () => { await Promise.resolve() })
-  assert.ok(streamApi)
+  expect(streamApi).not.toBeNull()
   await act(async () => { await streamApi?.abortStream() })
   await act(async () => { await Promise.resolve() })
-  assert.deepEqual(savedTexts, ['first'])
+  expect(savedTexts).toEqual(['first'])
 
   await act(async () => { runButton.click() })
   await act(async () => { await Promise.resolve() })
-  assert.deepEqual(savedTexts, ['first'])
+  expect(savedTexts).toEqual(['first'])
 
   await act(async () => { runButton.click() })
   await act(async () => { await Promise.resolve() })
   await act(async () => { await Promise.resolve() })
-  assert.deepEqual(savedTexts, ['first', 'third'])
+  expect(savedTexts).toEqual(['first', 'third'])
 
   const rightTextarea = container.querySelector('textarea[data-side="right"]')
-  assert.ok(rightTextarea instanceof HTMLTextAreaElement)
-  assert.equal(rightTextarea.value, 'third')
+  expect(rightTextarea).toBeInstanceOf(HTMLTextAreaElement)
+  expect(rightTextarea?.value).toBe('third')
 
   await act(async () => { root.unmount() })
   container.remove()

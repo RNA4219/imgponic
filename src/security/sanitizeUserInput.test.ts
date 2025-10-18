@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { sanitizeUserInput } from './sanitizeUserInput'
 
+const MAX_LENGTH = 40000
+
 describe('sanitizeUserInput', () => {
   it('masks credentials according to appendix patterns', () => {
     const sample = [
@@ -37,6 +39,16 @@ describe('sanitizeUserInput', () => {
     expect(result.overLimit).toBe(true)
     expect(result.maskedTypes).toEqual([])
     expect(result.sanitized).toBe(longText)
+  })
+
+  it('masks secrets even when the input is over the limit', () => {
+    const secret = 'AKIA1234567890ABCDEF'
+    const longText = `${'x'.repeat(MAX_LENGTH)}${secret}`
+    const result = sanitizeUserInput(longText)
+    expect(result.overLimit).toBe(true)
+    expect(result.sanitized).toMatch(/<REDACTED:[^>]+>/)
+    expect(result.sanitized).not.toContain(secret)
+    expect(result.maskedTypes).toEqual(['AWS_ACCESS_KEY'])
   })
 
   it('keeps text untouched just below the limit', () => {

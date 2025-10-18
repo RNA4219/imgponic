@@ -116,9 +116,9 @@ export const composePromptWithSelection = async (
 ): Promise<ComposeResult> => {
   const rawUserInput = determineUserInput(sendSelectionOnly, selection, leftText, selectionStart, selectionEnd, contextRadius)
   const sanitized = sanitizeUserInput(rawUserInput)
-  onSanitized?.({ ...sanitized, raw: rawUserInput })
-  const userInput = sanitized.overLimit ? rawUserInput : sanitized.sanitized
-  const res = await invokeFn('compose_prompt', { recipePath, inlineParams: { ...params, user_input: userInput } })
+  const sanitizedText = sanitized.sanitized
+  onSanitized?.({ ...sanitized, sanitized: sanitizedText, raw: rawUserInput })
+  const res = await invokeFn('compose_prompt', { recipePath, inlineParams: { ...params, user_input: sanitizedText } })
   return res as ComposeResult
 }
 
@@ -215,6 +215,10 @@ export default function App() {
   const updateLeftText = useCallback((value: string) => {
     setLeftText(value)
     setHasDangerWords(containsDangerWords(value))
+  }, [])
+
+  const clearStreamedResponse = useCallback(() => {
+    setRightText('')
   }, [])
 
   const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({

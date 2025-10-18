@@ -37,11 +37,6 @@ export const sanitizeUserInput = (text: string): SanitizedUserInput => {
     return { sanitized: '', maskedTypes: [], overLimit: false }
   }
 
-  const overLimit = text.length > MAX_LENGTH
-  if (overLimit) {
-    return { sanitized: text, maskedTypes: [], overLimit }
-  }
-
   let sanitized = text
   const maskedTypes = new Set<SanitizedType>()
 
@@ -51,6 +46,8 @@ export const sanitizeUserInput = (text: string): SanitizedUserInput => {
       return `<REDACTED:${type}>`
     })
   }
+
+  const overLimit = text.length > MAX_LENGTH
 
   return { sanitized, maskedTypes: Array.from(maskedTypes), overLimit }
 }
