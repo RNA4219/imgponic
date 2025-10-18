@@ -17,15 +17,19 @@
 - `workflow-cookbook/logs/test.jsonl`（ダミー。最初の動作確認用）
 - `workflow-cookbook/reports/.gitkeep`
 
-`workflow-cookbook/governance/policy.yaml` は CI が参照するテンプレートです。`governance/` 配下を整備する際は、このディレクトリごとコピーし、`governance/policy.yaml` を最新のポリシーで上書きしてください。
+`workflow-cookbook/governance/policy.yaml` は CI が参照するテンプレートです。
+`governance/` 配下を整備する際は、このディレクトリごとコピーし、
+`governance/policy.yaml` を最新のポリシーで上書きしてください。
 
 ## 使い方
+
 1. push or PR → `test` が走り、`workflow-cookbook/logs/test.jsonl` を生成
 2. `reflection` が実行され `workflow-cookbook/reports/today.md` を生成
 3. 失敗があれば `workflow-cookbook/reports/issue_suggestions.md` から Issue を自動作成
 4. 自動修正は **無効**（安全デチューン）。提案を読み、人間が修正PRを作成。
 
 ## 注意
+
 - `CODEOWNERS` を適切なユーザー/チームに設定してください。
-- `workflow-cookbook/reflection.yaml` の `analysis.max_tokens` を 0 にしているため、初日は LLM を使いません。
-  必要に応じて `engine: llm` と合わせて有効化してください。
+- `workflow-cookbook/reflection.yaml` の `analysis.max_tokens` は 0 です。
+- LLM を使う場合は `analysis.max_tokens` と `engine: llm` を併せて有効化してください。
