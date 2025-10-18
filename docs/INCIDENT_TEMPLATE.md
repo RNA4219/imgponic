@@ -11,7 +11,9 @@ evaluation: ../Day8/workflow-cookbook/EVALUATION.md
 
 <!-- markdownlint-disable MD013 -->
 
-[← README](../README.md#🚨-インシデント対応フロー) ｜ [BLUEPRINT](../Day8/workflow-cookbook/BLUEPRINT.md) ｜ [EVALUATION](../Day8/workflow-cookbook/EVALUATION.md)
+[← README](../README.md#🚨-インシデント対応フロー) ｜
+[BLUEPRINT](../Day8/workflow-cookbook/BLUEPRINT.md) ｜
+[EVALUATION](../Day8/workflow-cookbook/EVALUATION.md)
 
 ## 利用手順
 
@@ -69,7 +71,8 @@ evaluation: ../Day8/workflow-cookbook/EVALUATION.md
 
 ---
 
-最新例: [IN-20250215-001](IN-20250215-001.md) / 想定例: [IN-20250310-001](IN-20250310-001.md) を参照し、
+最新例: [IN-20250215-001](IN-20250215-001.md) /
+想定例: [IN-20250310-001](IN-20250310-001.md) を参照し、
 Runbook と Evaluation の要件に対する整合性を確認すること。
 
 <!-- markdownlint-enable MD013 -->
