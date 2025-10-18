@@ -18,7 +18,7 @@ walkdir = "2"
 futures-util = "0.3"
 
 [build-dependencies]
-tauri-build = "1"
+tauri-build = { version = "1", features = [] }
 
 [dev-dependencies]
 insta = "1"
