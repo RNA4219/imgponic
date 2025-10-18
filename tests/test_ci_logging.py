@@ -7,7 +7,8 @@ from pathlib import Path
 def _resolve_workflow_path(base_dir: Path | None = None) -> Path:
     """Return the workflow file path, preferring ``tests.yml`` over ``test.yml``."""
 
-    workflows_dir = base_dir or Path(".github/workflows")
+    root = base_dir or Path(".")
+    workflows_dir = root / ".github" / "workflows"
     preferred = workflows_dir / "tests.yml"
     if preferred.exists():
         return preferred
@@ -29,13 +30,14 @@ def _extract_step(block: str, name: str) -> str:
     return match.group("body")
 
 
+# NOTE: The CI workflow may be named ``tests.yml`` or ``test.yml``; keep both variants supported.
 def test_resolve_workflow_path_prefers_tests(tmp_path: Path) -> None:
     workflows_dir = tmp_path / ".github" / "workflows"
     workflows_dir.mkdir(parents=True)
     tests_file = workflows_dir / "tests.yml"
     tests_file.write_text("name: tests", encoding="utf-8")
 
-    assert _resolve_workflow_path(workflows_dir) == tests_file
+    assert _resolve_workflow_path(tmp_path) == tests_file
 
 
 def test_resolve_workflow_path_falls_back_to_test(tmp_path: Path) -> None:
@@ -44,7 +46,7 @@ def test_resolve_workflow_path_falls_back_to_test(tmp_path: Path) -> None:
     test_file = workflows_dir / "test.yml"
     test_file.write_text("name: test", encoding="utf-8")
 
-    assert _resolve_workflow_path(workflows_dir) == test_file
+    assert _resolve_workflow_path(tmp_path) == test_file
 
 
 def test_rust_job_uploads_cargo_test_log() -> None:
