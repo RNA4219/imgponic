@@ -4,12 +4,34 @@ import { writeText } from '@tauri-apps/api/clipboard'
 import { save } from '@tauri-apps/api/dialog'
 import { writeTextFile } from '@tauri-apps/api/fs'
 import './app.css'
+import { useOllamaStream } from './useOllamaStream'
 
 export type ComposeResult = { final_prompt: string; sha256: string; model: string }
 type InvokeFunction = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
-export const determineUserInput = (sendSelectionOnly: boolean, selection: string, leftText: string): string =>
-  sendSelectionOnly && selection ? selection : leftText
+const lineIndexBefore = (text: string, endExclusive: number): number =>
+  !text.length || endExclusive <= 0 ? 0 : text.slice(0, Math.min(endExclusive, text.length)).split('\n').length - 1
+
+export const determineUserInput = (
+  sendSelectionOnly: boolean,
+  selection: string,
+  leftText: string,
+  selectionStart: number | null,
+  selectionEnd: number | null,
+  contextRadius = 3
+): string => {
+  if (!sendSelectionOnly || !selection || selectionStart === null || selectionEnd === null || selectionStart === selectionEnd) return leftText
+  if (!leftText) return ''
+  const normalizedStart = Math.max(0, Math.min(selectionStart, leftText.length))
+  const normalizedEnd = Math.max(normalizedStart, Math.min(selectionEnd, leftText.length))
+  const lines = leftText.split('\n')
+  const startLineIndex = lineIndexBefore(leftText, normalizedStart)
+  const endLineIndex = lineIndexBefore(leftText, normalizedEnd)
+  const contextText = lines
+    .slice(Math.max(0, startLineIndex - contextRadius), Math.min(lines.length, endLineIndex + contextRadius + 1))
+    .join('\n')
+  return `[Lines ${startLineIndex + 1}-${endLineIndex + 1}]\n${contextText}`
+}
 
 export const composePromptWithSelection = async (
   {
@@ -18,7 +40,10 @@ export const composePromptWithSelection = async (
     recipePath,
     leftText,
     sendSelectionOnly,
-    selection
+    selection,
+    selectionStart,
+    selectionEnd,
+    contextRadius
   }: {
     invokeFn?: InvokeFunction
     params: Record<string, unknown>
@@ -26,15 +51,26 @@ export const composePromptWithSelection = async (
     leftText: string
     sendSelectionOnly: boolean
     selection: string
+    selectionStart: number | null
+    selectionEnd: number | null
+    contextRadius?: number
   }
 ): Promise<ComposeResult> => {
-  const userInput = determineUserInput(sendSelectionOnly, selection, leftText)
+  const userInput = determineUserInput(sendSelectionOnly, selection, leftText, selectionStart, selectionEnd, contextRadius)
   const res = await invokeFn('compose_prompt', { recipePath, inlineParams: { ...params, user_input: userInput } })
   return res as ComposeResult
 }
 
-export const formatSelectionSummary = (sendSelectionOnly: boolean, selection: string, leftText: string): string =>
-  `送信文字数: 約${determineUserInput(sendSelectionOnly, selection, leftText).length}字`
+export const formatSelectionSummary = (sendSelectionOnly: boolean, selection: string, preview: string): string => {
+  const label = sendSelectionOnly && selection ? '選択+前後3行' : '全文'
+  const lines = preview
+    ? preview
+        .split('\n')
+        .filter((line, idx, arr) => !(line === '' && idx === arr.length - 1))
+        .length
+    : 0
+  return `${label} / 送信行数: ${lines}行 / 送信文字数: 約${preview.length}字`
+}
 
 type Workspace = {
   version: number
@@ -97,6 +133,22 @@ export default function App() {
   const leftTextRef = useRef<HTMLTextAreaElement>(null)
   const [sendSelectionOnly, setSendSelectionOnly] = useState<boolean>(false)
   const [leftSelection, setLeftSelection] = useState<string>('')
+  const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
+  const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
+
+  const { startStream, abortStream, isStreaming } = useOllamaStream({
+    onChunk: chunk => setRightText(prev => prev + chunk),
+    onEnd: () => setRunning(false),
+    onError: () => setRunning(false)
+  })
+
+  useEffect(() => {
+    if (running) {
+      runBtnRef.current?.classList.add('active')
+    } else {
+      runBtnRef.current?.classList.remove('active')
+    }
+  }, [running])
 
   // プロジェクトファイルパス（project/ 内相対）
   const [projRel, setProjRel] = useState('src/example.py')
@@ -160,16 +212,20 @@ export default function App() {
       recipePath,
       leftText,
       sendSelectionOnly,
-      selection: leftSelection
+      selection: leftSelection,
+      selectionStart: leftSelectionStart,
+      selectionEnd: leftSelectionEnd,
+      contextRadius: 3
     })
     setComposed(res)
     return res
-  }, [params, recipePath, leftText, sendSelectionOnly, leftSelection])
+  }, [params, recipePath, leftText, sendSelectionOnly, leftSelection, leftSelectionStart, leftSelectionEnd])
 
   // 実行（▶）
   const runOllama = useCallback(async () => {
+    if (isStreaming) return
     setRunning(true)
-    runBtnRef.current?.classList.add('active')
+    setRightText('')
     try {
       const c = composed ?? await doCompose()
       const sep = '\n---\nUSER_INPUT'
@@ -177,24 +233,27 @@ export default function App() {
       const sys = at < 0 ? c.final_prompt : c.final_prompt.slice(0, at)
       const user = at < 0 ? '' : c.final_prompt.slice(at)
 
-      const res = await invoke('run_ollama_chat', {
+      await startStream({
         model: ollamaModel,
         systemText: sys,
         userText: user
       })
-      setRightText(res as string)
-    } finally {
-      setTimeout(() => runBtnRef.current?.classList.remove('active'), 120)
+    } catch (error) {
+      console.error('run ollama stream failed', error)
       setRunning(false)
     }
-  }, [composed, doCompose, ollamaModel])
+  }, [isStreaming, composed, doCompose, startStream, ollamaModel])
 
   // 右→左 反映（プレビュー付き）
   const diffFlow = useMemo(() => createDiffPreviewFlow({ readLeft: () => leftText, readRight: () => rightText, show: value => setDiffPatch(value), apply: value => setLeftText(value), close: () => setDiffPatch(null) }), [leftText, rightText])
   const { open: openDiffPreview, confirm: confirmDiffPreview, cancel: cancelDiffPreview } = diffFlow
 
+  const selectionPreview = determineUserInput(sendSelectionOnly, leftSelection, leftText, leftSelectionStart, leftSelectionEnd, 3)
+
   const handleLeftSelection = useCallback((target: HTMLTextAreaElement) => {
     const { selectionStart, selectionEnd, value } = target
+    setLeftSelectionStart(selectionStart)
+    setLeftSelectionEnd(selectionEnd)
     setLeftSelection(selectionStart === selectionEnd ? '' : value.slice(selectionStart, selectionEnd))
   }, [])
 
@@ -311,10 +370,16 @@ export default function App() {
           <label className="toolbar" style={{ gap: 6, alignItems: 'center' }}>
             <input type="checkbox" checked={sendSelectionOnly} onChange={e => setSendSelectionOnly(e.target.checked)} />
             <span>選択のみ送る</span>
-            <span className="badge">{formatSelectionSummary(sendSelectionOnly, leftSelection, leftText)}</span>
+            <span className="badge">{formatSelectionSummary(sendSelectionOnly, leftSelection, selectionPreview)}</span>
           </label>
+          <details style={{ maxWidth: 280 }}>
+            <summary>送信範囲プレビュー</summary>
+            <pre style={{ marginTop: 8, maxHeight: 180, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{selectionPreview || '(なし)'}</pre>
+          </details>
           {composed && <div className="badge">SHA-256: {composed.sha256.slice(0,16)}…</div>}
-          <button ref={runBtnRef} className={`btn primary runpulse ${running ? 'active' : ''}`} onClick={runOllama} disabled={running}>
+          {isStreaming && <span>Streaming...</span>}
+          <button className="btn" onClick={abortStream} disabled={!isStreaming}>停止</button>
+          <button ref={runBtnRef} className={`btn primary runpulse ${running ? 'active' : ''}`} onClick={runOllama} disabled={isStreaming}>
             ▶ 実行（Ctrl/Cmd+Enter）
           </button>
         </div>
