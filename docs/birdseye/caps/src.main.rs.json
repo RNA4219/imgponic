@@ -1,7 +1,7 @@
 {
   "id": "src/main.rs",
   "role": "backend-tauri",
-  "summary": "Tauri 側のバックエンド。レシピ連結 compose_prompt、Ollama チャット/ストリーム橋渡し、プロジェクト/ワークスペースIO、ラン保存を提供し、ファイルサンドボックスを enforce する。",
+  "summary": "Tauri 側のバックエンド。レシピ連結 compose_prompt、Ollama チャット/ストリーム橋渡し、プロジェクト/ワークスペースIOとプロンプト/テキスト補助、セットアップ検証、ラン保存を提供し、ファイルサンドボックスを enforce する。",
   "public_api": [
     "compose_prompt()",
     "run_ollama_chat()",
@@ -12,7 +12,11 @@
     "read_project_file()",
     "write_project_file()",
     "read_workspace()",
-    "write_workspace()"
+    "write_workspace()",
+    "list_prompt_files()",
+    "read_prompt_file()",
+    "load_txt_excerpt()",
+    "check_ollama_setup()"
   ],
   "deps_in": [
     "src/App.tsx",
