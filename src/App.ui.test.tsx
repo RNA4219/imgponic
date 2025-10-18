@@ -33,6 +33,44 @@ if (!domInstance) {
   globalScope.navigator ??= {}
 }
 
+const ensureLocalStorage = () => {
+  const data = new Map<string, string>()
+  const storage: Storage = {
+    get length() {
+      return data.size
+    },
+    clear: () => {
+      data.clear()
+    },
+    getItem: key => (data.has(key) ? data.get(key)! : null),
+    key: index => Array.from(data.keys())[index] ?? null,
+    removeItem: key => {
+      data.delete(key)
+    },
+    setItem: (key, value) => {
+      data.set(key, String(value))
+    }
+  }
+
+  Object.defineProperty(globalScope, 'localStorage', {
+    value: storage,
+    configurable: true
+  })
+
+  if (globalScope.window) {
+    Object.defineProperty(globalScope.window, 'localStorage', {
+      value: storage,
+      configurable: true
+    })
+  }
+}
+
+if (!('localStorage' in globalScope)) {
+  ensureLocalStorage()
+} else if (globalScope.window && !('localStorage' in globalScope.window)) {
+  ensureLocalStorage()
+}
+
 const streamModule = await import('./useOllamaStream')
 const setupModule = await import('./useSetupCheck')
 
@@ -310,6 +348,78 @@ domTest('loads corpus excerpt, injects into compose params, and renders preview 
   assert.equal(composeCalls.length, 1)
   const inlineParams = (composeCalls[0].inlineParams ?? {}) as Record<string, unknown>
   assert.equal(inlineParams.doc_excerpt, '頭 75% ... 尾 25%')
+
+  await act(async () => { root.unmount() })
+  container.remove()
+})
+
+domTest('re-composes prompt with latest left text when rerunning', async () => {
+  const composeInputs: string[] = []
+  const bridge = {
+    async invoke(_cmd: string, _args?: Record<string, unknown>) {
+      return undefined
+    }
+  }
+  const invokeMock = mock.method(bridge, 'invoke', async (cmd: string, args?: Record<string, unknown>) => {
+    if (cmd === 'read_workspace') return null
+    if (cmd === 'write_workspace') return 'ok'
+    if (cmd === 'compose_prompt') {
+      const inlineParams = (args?.inlineParams ?? {}) as { user_input?: string }
+      const userInput = inlineParams.user_input ?? ''
+      composeInputs.push(userInput)
+      return { final_prompt: `system\n---\nUSER_INPUT${userInput}`, sha256: 'hash', model: 'model' }
+    }
+    return undefined
+  })
+  appMockContainer.__APP_MOCKS__ = {
+    invoke: bridge.invoke,
+    useOllamaStream: () => ({
+      ...noopStream,
+      startStream: async () => {}
+    })
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+  await act(async () => { root.render(<App />) })
+
+  const leftTextarea = container.querySelector('textarea[data-side="left"]')
+  assert.ok(leftTextarea instanceof HTMLTextAreaElement)
+
+  await act(async () => {
+    leftTextarea.value = 'first run text'
+    leftTextarea.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+
+  const runButton = container.querySelector('.runpulse')
+  assert.ok(runButton instanceof HTMLButtonElement)
+
+  await act(async () => {
+    runButton.click()
+    await Promise.resolve()
+  })
+
+  const composeCalls = invokeMock.mock.calls.filter(call => call.arguments[0] === 'compose_prompt')
+  assert.equal(composeCalls.length, 1)
+  const firstArgs = composeCalls[0].arguments[1] as { inlineParams?: { user_input?: string } } | undefined
+  assert.equal(firstArgs?.inlineParams?.user_input, 'first run text')
+  assert.deepEqual(composeInputs, ['first run text'])
+
+  await act(async () => {
+    leftTextarea.value = 'second run text'
+    leftTextarea.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+
+  await act(async () => {
+    runButton.click()
+    await Promise.resolve()
+  })
+
+  const composeCallsAfter = invokeMock.mock.calls.filter(call => call.arguments[0] === 'compose_prompt')
+  assert.equal(composeCallsAfter.length, 2)
+  const secondArgs = composeCallsAfter[1].arguments[1] as { inlineParams?: { user_input?: string } } | undefined
+  assert.equal(secondArgs?.inlineParams?.user_input, 'second run text')
+  assert.deepEqual(composeInputs, ['first run text', 'second run text'])
 
   await act(async () => { root.unmount() })
   container.remove()

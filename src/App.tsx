@@ -348,6 +348,10 @@ export default function App() {
     return res
   }, [invokeFn, params, recipePath, leftText, sendSelectionOnly, leftSelection, leftSelectionStart, leftSelectionEnd])
 
+  useEffect(() => {
+    setComposed(null)
+  }, [leftText, recipePath, params, sendSelectionOnly, leftSelection, leftSelectionStart, leftSelectionEnd])
+
   // 実行（▶）
   const runOllama = useCallback(async () => {
     if (isStreaming) return
