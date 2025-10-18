@@ -16,6 +16,8 @@ env:
 jobs:
   lint:
     runs-on: ubuntu-24.04
+    env:
+      TEST_LOG_ARTIFACT: test-logs-${{ github.job }}
     steps:
       - uses: actions/checkout@v4
       - run: mkdir -p workflow-cookbook/logs
@@ -44,11 +46,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: ${{ env.TEST_LOG_ARTIFACT }}
           path: workflow-cookbook/logs/*
 
   format:
     runs-on: ubuntu-24.04
+    env:
+      TEST_LOG_ARTIFACT: test-logs-${{ github.job }}
     steps:
       - uses: actions/checkout@v4
       - run: mkdir -p workflow-cookbook/logs
@@ -73,11 +77,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: ${{ env.TEST_LOG_ARTIFACT }}
           path: workflow-cookbook/logs/*
 
   typecheck:
     runs-on: ubuntu-24.04
+    env:
+      TEST_LOG_ARTIFACT: test-logs-${{ github.job }}
     steps:
       - uses: actions/checkout@v4
       - run: mkdir -p workflow-cookbook/logs
@@ -102,11 +108,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: ${{ env.TEST_LOG_ARTIFACT }}
           path: workflow-cookbook/logs/*
 
   unit:
     runs-on: ubuntu-24.04
+    env:
+      TEST_LOG_ARTIFACT: test-logs-${{ github.job }}
     steps:
       - uses: actions/checkout@v4
       - run: mkdir -p workflow-cookbook/logs
@@ -187,11 +195,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: ${{ env.TEST_LOG_ARTIFACT }}
           path: workflow-cookbook/logs/*
 
   security:
     runs-on: ubuntu-24.04
+    env:
+      TEST_LOG_ARTIFACT: test-logs-${{ github.job }}
     steps:
       - uses: actions/checkout@v4
       - run: mkdir -p workflow-cookbook/logs
@@ -212,11 +222,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: ${{ env.TEST_LOG_ARTIFACT }}
           path: workflow-cookbook/logs/*
 
   coverage:
     runs-on: ubuntu-24.04
+    env:
+      TEST_LOG_ARTIFACT: test-logs-${{ github.job }}
     steps:
       - uses: actions/checkout@v4
       - run: mkdir -p workflow-cookbook/logs
@@ -241,12 +253,14 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: ${{ env.TEST_LOG_ARTIFACT }}
           path: workflow-cookbook/logs/*
 
   build:
     needs: [lint, typecheck, unit]
     runs-on: ubuntu-24.04
+    env:
+      TEST_LOG_ARTIFACT: test-logs-${{ github.job }}
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -279,12 +293,14 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: ${{ env.TEST_LOG_ARTIFACT }}
           path: workflow-cookbook/logs/*
 
   e2e:
     needs: [build]
     runs-on: ubuntu-24.04
+    env:
+      TEST_LOG_ARTIFACT: test-logs-${{ github.job }}
     steps:
       - uses: actions/checkout@v4
       - run: mkdir -p workflow-cookbook/logs
@@ -310,7 +326,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: ${{ env.TEST_LOG_ARTIFACT }}
           path: workflow-cookbook/logs/*
 
   report:
@@ -319,8 +335,9 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: test-logs
+          pattern: test-logs-*
           path: logs
+          merge-multiple: true
       - name: Summarize & STRICT gate (optional)
         run: |
           set -Eeuo pipefail
