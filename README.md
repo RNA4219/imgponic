@@ -1,3 +1,11 @@
+---
+intent_id: imgponic-readme
+owner: imgponic-team
+status: active
+last_reviewed_at: 2024-10-01
+next_review_due: 2025-04-01
+---
+
 # Imgponic — 想像を育てるプロンプト温室
 **Version:** 1.0.0  
 **License:** MIT  

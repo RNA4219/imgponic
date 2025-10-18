@@ -1,3 +1,11 @@
+---
+intent_id: imgponic-changelog
+owner: imgponic-team
+status: active
+last_reviewed_at: 2024-10-01
+next_review_due: 2025-04-01
+---
+
 # Changelog
 All notable changes to this project will be documented in this file.
 
