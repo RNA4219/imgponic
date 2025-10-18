@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod ollama_stream;
+mod setup_check;
 mod txt_excerpt;
 
 #[cfg(test)]
@@ -18,6 +19,7 @@ use std::path::{Path, PathBuf};
 use tokio::task::{AbortHandle, Abortable};
 
 use crate::ollama_stream::{parse_ollama_jsonl_chunk, OllamaEvent, StreamState};
+use crate::setup_check::check_ollama_setup;
 
 #[derive(Debug, Deserialize)]
 struct Recipe {
@@ -635,6 +637,7 @@ fn main() {
         .manage(StreamState::default())
         .invoke_handler(tauri::generate_handler![
             compose_prompt,
+            check_ollama_setup,
             run_ollama_chat,
             run_ollama_stream,
             abort_current_stream,
