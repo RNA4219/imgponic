@@ -22,20 +22,53 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: ESLint (if exists)
+      - name: ESLint
         run: |
           set -Eeuo pipefail
-          if [ -f package.json ] && node -e "p=require('./package.json');process.exit(!(p.scripts&&p.scripts.lint))"; then
+          if [ -f package.json ]; then
             start=$(date +%s%3N)
             if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
               npm ci
             else
               npm install --no-audit --no-fund
             fi
-            if npm run -s lint; then s=pass; else s=fail; fi
+            if node -e "p=require('./package.json');process.exit(!(p.scripts&&p.scripts.lint))"; then
+              if npm run -s lint; then s=pass; else s=fail; fi
+            else
+              if npx eslint .; then s=pass; else s=fail; fi
+            fi
             echo "{\"name\":\"lint\",\"status\":\"$s\",\"duration_ms\":$(( $(date +%s%3N)-start ))}" >> workflow-cookbook/logs/test.jsonl
           else
             echo "{\"name\":\"lint\",\"status\":\"skip\",\"duration_ms\":0}" >> workflow-cookbook/logs/test.jsonl
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-logs
+          path: workflow-cookbook/logs/*
+
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir -p workflow-cookbook/logs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prettier
+        run: |
+          set -Eeuo pipefail
+          if [ -f package.json ]; then
+            start=$(date +%s%3N)
+            if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+              npm ci
+            else
+              npm install --no-audit --no-fund
+            fi
+            if npx prettier --check .; then s=pass; else s=fail; fi
+            echo "{\"name\":\"format\",\"status\":\"$s\",\"duration_ms\":$(( $(date +%s%3N)-start ))}" >> workflow-cookbook/logs/test.jsonl
+          else
+            echo "{\"name\":\"format\",\"status\":\"skip\",\"duration_ms\":0}" >> workflow-cookbook/logs/test.jsonl
           fi
       - uses: actions/upload-artifact@v4
         if: always()
@@ -61,7 +94,7 @@ jobs:
             else
               npm install --no-audit --no-fund
             fi
-            if npx tsc -noEmit; then s=pass; else s=fail; fi
+            if npx tsc --noEmit; then s=pass; else s=fail; fi
             echo "{\"name\":\"typecheck\",\"status\":\"$s\",\"duration_ms\":$(( $(date +%s%3N)-start ))}" >> workflow-cookbook/logs/test.jsonl
           else
             echo "{\"name\":\"typecheck\",\"status\":\"skip\",\"duration_ms\":0}" >> workflow-cookbook/logs/test.jsonl
@@ -157,6 +190,60 @@ jobs:
           name: test-logs
           path: workflow-cookbook/logs/*
 
+  security:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir -p workflow-cookbook/logs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: npm audit (moderate)
+        run: |
+          set -Eeuo pipefail
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            start=$(date +%s%3N)
+            npm ci
+            if npm audit --audit-level=moderate; then s=pass; else s=fail; fi
+            echo "{\"name\":\"security\",\"status\":\"$s\",\"duration_ms\":$(( $(date +%s%3N)-start ))}" >> workflow-cookbook/logs/test.jsonl
+          else
+            echo "{\"name\":\"security\",\"status\":\"skip\",\"duration_ms\":0}" >> workflow-cookbook/logs/test.jsonl
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-logs
+          path: workflow-cookbook/logs/*
+
+  coverage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir -p workflow-cookbook/logs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Coverage (if script exists)
+        run: |
+          set -Eeuo pipefail
+          if [ -f package.json ] && node -e "p=require('./package.json');process.exit(!(p.scripts&&p.scripts.coverage))"; then
+            start=$(date +%s%3N)
+            if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+              npm ci
+            else
+              npm install --no-audit --no-fund
+            fi
+            if npm run -s coverage; then s=pass; else s=fail; fi
+            echo "{\"name\":\"coverage\",\"status\":\"$s\",\"duration_ms\":$(( $(date +%s%3N)-start ))}" >> workflow-cookbook/logs/test.jsonl
+          else
+            echo "{\"name\":\"coverage\",\"status\":\"skip\",\"duration_ms\":0}" >> workflow-cookbook/logs/test.jsonl
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-logs
+          path: workflow-cookbook/logs/*
+
   build:
     needs: [lint, typecheck, unit]
     runs-on: ubuntu-24.04
@@ -227,7 +314,7 @@ jobs:
           path: workflow-cookbook/logs/*
 
   report:
-    needs: [lint, typecheck, unit, build, e2e]
+    needs: [lint, format, typecheck, unit, security, coverage, build, e2e]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4
