@@ -336,6 +336,22 @@ fn ensure_under(base: &Path, target: &Path) -> Result<(), io::Error> {
 }
 
 // ---------- Project file I/O ----------
+const PROJECT_ALLOWED_EXTS: &[&str] = &["py", "txt", "md", "json"];
+
+fn assert_allowed_project_ext(path: &Path) -> Result<(), String> {
+    let ext = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let is_allowed = PROJECT_ALLOWED_EXTS.iter().any(|allowed| ext == *allowed);
+    if is_allowed {
+        Ok(())
+    } else {
+        Err("unsupported extension".into())
+    }
+}
+
 #[derive(Debug, Serialize)]
 struct ProjectEntry {
     path: String,
@@ -351,8 +367,9 @@ fn list_project_files(exts: Option<Vec<String>>) -> Result<Vec<ProjectEntry>, St
         fs::create_dir_all(&base).map_err(|e| e.to_string())?;
     }
     let mut out = vec![];
-    let allow_exts: Option<Vec<String>> =
-        exts.map(|v| v.into_iter().map(|s| s.to_lowercase()).collect());
+    let allow_exts: Vec<String> = exts
+        .map(|v| v.into_iter().map(|s| s.to_lowercase()).collect())
+        .unwrap_or_else(|| PROJECT_ALLOWED_EXTS.iter().map(|s| s.to_string()).collect());
     for e in WalkDir::new(&base).into_iter().filter_map(|e| e.ok()) {
         if e.file_type().is_file() {
             let p = e.path();
@@ -361,10 +378,8 @@ fn list_project_files(exts: Option<Vec<String>>) -> Result<Vec<ProjectEntry>, St
                 .and_then(|s| s.to_str())
                 .unwrap_or("")
                 .to_lowercase();
-            if let Some(ref allow) = allow_exts {
-                if !allow.contains(&ext) {
-                    continue;
-                }
+            if !allow_exts.contains(&ext) {
+                continue;
             }
             let meta = fs::metadata(p).map_err(|e| e.to_string())?;
             let rel = p.strip_prefix(&base).unwrap().to_string_lossy().to_string();
@@ -390,6 +405,7 @@ struct FileContent {
 fn read_project_file(rel_path: String) -> Result<FileContent, String> {
     let base = PathBuf::from("project");
     let p = base.join(&rel_path);
+    assert_allowed_project_ext(&p)?;
     if !p.exists() {
         return Err("file not found".into());
     }
@@ -405,6 +421,7 @@ fn read_project_file(rel_path: String) -> Result<FileContent, String> {
 fn write_project_file(rel_path: String, content: String) -> Result<String, String> {
     let base = PathBuf::from("project");
     let p = base.join(&rel_path);
+    assert_allowed_project_ext(&p)?;
     if let Some(dir) = p.parent() {
         fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
@@ -429,6 +446,11 @@ struct Workspace {
 #[cfg(test)]
 pub mod workspace_test_support {
     pub use super::{workspace_path, write_workspace, Workspace};
+}
+
+#[cfg(test)]
+pub mod project_io_test_support {
+    pub use super::{list_project_files, read_project_file, write_project_file};
 }
 
 fn workspace_path(app: &tauri::AppHandle) -> PathBuf {
