@@ -46,4 +46,38 @@ describe('sanitizeUserInput', () => {
     expect(result.maskedTypes).toEqual([])
     expect(result.sanitized).toBe(thresholdText)
   })
+
+  it('redacts secrets even when input exceeds the length limit', () => {
+    const detectMaxLength = (): number => {
+      let low = 0
+      let high = 1
+      while (!sanitizeUserInput('x'.repeat(high)).overLimit) {
+        low = high
+        high *= 2
+      }
+      while (low + 1 < high) {
+        const mid = Math.floor((low + high) / 2)
+        if (sanitizeUserInput('x'.repeat(mid)).overLimit) {
+          high = mid
+        } else {
+          low = mid
+        }
+      }
+      return low
+    }
+
+    const MAX_LENGTH = detectMaxLength()
+    const secret = "api-key: 'MySecretTokenABCDEFG123456'"
+    const fillerLength = Math.max(0, MAX_LENGTH + 1 - secret.length)
+    const longText = `${'x'.repeat(fillerLength)}${secret}`
+
+    expect(longText.length).toBeGreaterThan(MAX_LENGTH)
+
+    const result = sanitizeUserInput(longText)
+
+    expect(result.overLimit).toBe(true)
+    expect(result.sanitized).toContain('<REDACTED:API_KEY>')
+    expect(result.sanitized).not.toContain('MySecretToken')
+    expect(result.maskedTypes).toEqual(['API_KEY'])
+  })
 })

@@ -1,3 +1,4 @@
+import { strict as assert } from 'node:assert'
 import { JSDOM } from 'jsdom'
 import { afterAll, afterEach, expect, test, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -70,6 +71,8 @@ const getReactProps = (node: Element): Record<string, unknown> | null => {
 }
 
 const diffModule = await import('diff')
+
+const sanitizeModule = await import('./security/sanitizeUserInput')
 
 const {
   default: App,
@@ -385,6 +388,52 @@ test('composePromptWithSelection masks sensitive text before invoking compose_pr
   expect(capturedUserInput).not.toContain('MySecretToken')
   expect(capturedUserInput).toBe(snapshot.sanitized)
   expect(res).toEqual({ final_prompt: 'fp', sha256: 'hash', model: 'model' })
+})
+
+test('composePromptWithSelection uses masked text even when sanitizeUserInput reports overLimit', async () => {
+  const rawSelection = 'some secret token'
+  const sanitizedValue = '<REDACTED:API_KEY>'
+  const sanitizeSpy = vi.spyOn(sanitizeModule, 'sanitizeUserInput').mockReturnValue({
+    sanitized: sanitizedValue,
+    maskedTypes: ['API_KEY'],
+    overLimit: true
+  })
+
+  try {
+    let capturedUserInput = ''
+    let snapshot: { sanitized: string; maskedTypes: string[]; overLimit: boolean; raw: string } | null = null
+    const res = await composePromptWithSelection({
+      invokeFn: async (_cmd, args) => {
+        capturedUserInput = String((args?.inlineParams as { user_input: string }).user_input)
+        return { final_prompt: 'fp', sha256: 'hash', model: 'model' }
+      },
+      params: {},
+      recipePath: 'recipe.yaml',
+      leftText: rawSelection,
+      sendSelectionOnly: true,
+      selection: rawSelection,
+      selectionStart: 0,
+      selectionEnd: rawSelection.length,
+      contextRadius: 3,
+      onSanitized: value => {
+        snapshot = value
+      }
+    })
+
+    expect(sanitizeSpy).toHaveBeenCalledTimes(1)
+    const expectedRaw = determineUserInput(true, rawSelection, rawSelection, 0, rawSelection.length, 3)
+    expect(sanitizeSpy).toHaveBeenCalledWith(expectedRaw)
+    expect(snapshot).not.toBeNull()
+    const nonNullSnapshot = snapshot as NonNullable<typeof snapshot>
+    expect(nonNullSnapshot.raw).toBe(expectedRaw)
+    expect(nonNullSnapshot.overLimit).toBe(true)
+    expect(nonNullSnapshot.maskedTypes).toEqual(['API_KEY'])
+    expect(nonNullSnapshot.sanitized).toBe(sanitizedValue)
+    expect(capturedUserInput).toBe(sanitizedValue)
+    expect(res).toEqual({ final_prompt: 'fp', sha256: 'hash', model: 'model' })
+  } finally {
+    sanitizeSpy.mockRestore()
+  }
 })
 
 test('diff preview requires approval before applying', () => {
