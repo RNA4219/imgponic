@@ -1,7 +1,9 @@
 # Imgponic 次のステップ設計仕様（v0.4-pre）
+
 **範囲**: テーマ適用 / UI改善 / 小さな安全性の追加（既存v0.4計画と整合）
 
 ## 1. 優先タスク（2週間スプリント想定）
+
 1. **テーマ統合（配色の反映）**
    - `src/app.css` にCSS変数（配色仕様）を導入
    - 既存色を `var(--*)` に置換（ボタン/パネル/入力/リンク）
@@ -19,7 +21,9 @@
    - 受け入れ: 差分の確認なしに上書きしないオプションが選べる
 
 ## 2. 実装詳細（テーマ統合）
+
 ### 2.1 CSS置換マップ
+
 | 対象 | 現状 | 新トークン |
 |---|---|---|
 | 背景 | `#0b0d10` 等 | `var(--bg)` |
@@ -29,24 +33,36 @@
 | アクセント | 固定緑 | `var(--accent-400)` ほか |
 
 ### 2.2 コンポーネント規約
-- Primaryボタン: 背景 `var(--accent-400)` → hover: `--accent-300` → active: `--accent-500`
-- Secondaryボタン: `background:#FFFFFF80; border:1px solid var(--accent-600)`
-- 入力: `background: var(--accent-50); outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--accent-600)`（focus）
-- カード: `background: var(--panel); border: 1px solid var(--border); box-shadow: 0 2px 8px var(--shadow)`
+
+- Primaryボタン:
+  背景 `var(--accent-400)`
+  → hover: `--accent-300`
+  → active: `--accent-500`
+- Secondaryボタン:
+  `background:#FFFFFF80; border:1px solid var(--accent-600)`
+- 入力:
+  `background: var(--accent-50); outline: 2px solid transparent;`
+  `box-shadow: 0 0 0 2px var(--accent-600)`（focus）
+- カード:
+  `background: var(--panel); border: 1px solid var(--border);`
+  `box-shadow: 0 2px 8px var(--shadow)`
 
 ## 3. 受け入れ基準（全体）
+
 - [ ] 既存画面の視認性が向上し、**長文編集でも疲れない**
 - [ ] 選択送信で**LLMへの文字数**が目に見えて減る
 - [ ] 差分プレビューで**誤上書きがゼロ**になる（確認を必須化可能）
 - [ ] 主要操作（実行/反映/保存/コピー）が**3クリック以内**
 
 ## 4. 将来（スプリント次）
+
 - ストリーミング / 停止ボタン（Rustイベント + UI追記）
 - タブUI v2（名前/色/並べ替え/永続化）
 - 機密マスク（送信前正規表現）/ workspace.bak
 - CIとIssueテンプレ、Docsの整備（v0.4計画に準拠）
 
 ## 5. パッチ例（`src/app.css`嵌め込み）
+
 ```diff
 --- a/src/app.css
 +++ b/src/app.css
