@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createTwoFilesPatch } from 'diff'
 import { invoke } from '@tauri-apps/api/core'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { save } from '@tauri-apps/plugin-dialog'
@@ -153,19 +154,18 @@ type DiffPreviewCallbacks = {
 }
 
 export const buildUnifiedDiff = (before: string, after: string): string => {
-  const header = '--- 左\n+++ 右\n@@'
-  if (before === after) return `${header}\n  (差分はありません)`
-  const beforeLines = before.split('\n')
-  const afterLines = after.split('\n')
-  const body = Array.from({ length: Math.max(beforeLines.length, afterLines.length) }, (_, idx) => {
-    const left = beforeLines[idx]
-    const right = afterLines[idx]
-    if (left === right) return ` ${left ?? ''}`
-    const minus = left !== undefined ? `-${left}` : ''
-    const plus = right !== undefined ? `+${right}` : ''
-    return [minus, plus].filter(Boolean).join('\n')
-  }).join('\n')
-  return `${header}\n${body}`
+  if (before === after) {
+    return ['--- 左', '+++ 右', '@@', '  (差分はありません)'].join('\n')
+  }
+  const patch = createTwoFilesPatch('左', '右', before, after, '', '', { context: 3 })
+  const lines = patch.split('\n')
+  if (lines.length > 0 && lines[0] === '===================================================================') {
+    lines.shift()
+  }
+  while (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop()
+  }
+  return lines.join('\n')
 }
 
 export const createDiffPreviewFlow = (callbacks: DiffPreviewCallbacks) => ({
@@ -212,6 +212,7 @@ export default function App() {
   const [leftSelection, setLeftSelection] = useState<string>('')
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
+  const streamedResponseRef = useRef<string>('')
   const updateLeftText = useCallback((value: string) => {
     setLeftText(value)
     setHasDangerWords(containsDangerWords(value))
@@ -227,14 +228,25 @@ export default function App() {
     onError: message => {
       console.error('ollama stream error', message)
       setRunning(false)
+      setOllamaError(describeOllamaError(message))
       clearStreamedResponse()
-    }
+    },
+    [clearStreamedResponse, setOllamaError]
+  )
+
+  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
+    onChunk: appendStreamChunk,
+    onEnd: () => {
+      void handleStreamEnd()
+    },
+    onError: handleStreamError
   })
   const abortStream = useCallback(async () => {
     resetOllamaError()
     setRunning(false)
     await rawAbortStream()
-  }, [resetOllamaError, rawAbortStream])
+    clearStreamedResponse()
+  }, [clearStreamedResponse, resetOllamaError, rawAbortStream])
 
   useEffect(() => {
     const storedContrast = localStorage.getItem(ACCESSIBILITY_STORAGE_KEYS.highContrast)
@@ -386,7 +398,6 @@ export default function App() {
     if (isStreaming) return
     resetOllamaError()
     setRunning(true)
-    setRightText('')
     clearStreamedResponse()
     try {
       const c = composed ?? await doCompose()
