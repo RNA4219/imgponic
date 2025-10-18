@@ -6,6 +6,7 @@ last_reviewed_at: 2024-10-01
 next_review_due: 2025-04-01
 ---
 
+<!-- markdownlint-disable MD013 -->
 <!-- markdownlint-disable-next-line MD022 MD041 -->
 # Imgponic — 想像を育てるプロンプト温室
 **Version:** 1.0.0
@@ -18,10 +19,12 @@ Imgponic は、**プロンプトとコードを“育てる”ためのローカ
 <!-- LLM-BOOTSTRAP v1 -->
 
 読む順番:
+
 1. docs/birdseye/index.json …… ノード一覧・隣接関係（軽量）
-2. docs/birdseye/caps/<path>.json …… 必要ノードだけ point read（個別カプセル）
+2. docs/birdseye/caps/{path}.json …… 必要ノードだけ point read（個別カプセル）
 
 フォーカス手順:
+
 - 直近変更ファイル±2hopのノードIDを index.json から取得
 - 対応する caps/*.json のみ読み込み
 <!-- /LLM-BOOTSTRAP -->
@@ -132,9 +135,13 @@ docs/           # 仕様/設計/配色ほか
 
 ## 🚨 インシデント対応フロー
 
-1. `docs/INCIDENT_TEMPLATE.md` をコピーし、`docs/IN-YYYYMMDD-XXX.md`（例: [IN-20250215-001](docs/IN-20250215-001.md)、想定: [IN-20250310-001](docs/IN-20250310-001.md)）として保存。
-2. 検知・影響・5Whys・再発防止・タイムラインを Runbook/Evaluation の要件に沿って記入し、各節に Blueprint/Evaluation の該当リンクを差し込む。
-3. 対応完了後は関連PRと RUNBOOK/EVALUATION へ相互リンクを追加し、Preventive Actions の追跡Issueを更新して README の運用例を最新化。
+1. `docs/INCIDENT_TEMPLATE.md` をコピーし、`docs/IN-YYYYMMDD-XXX.md` として保存
+   （例: [IN-20250215-001](docs/IN-20250215-001.md)、
+   想定: [IN-20250310-001](docs/IN-20250310-001.md)）。
+2. 検知・影響・5Whys・再発防止・タイムラインを Runbook/Evaluation の要件に沿って記入し、
+   各節へ Blueprint/Evaluation の該当リンクを差し込む。
+3. 対応完了後は関連PRと RUNBOOK/EVALUATION へ相互リンクを追加し、
+   Preventive Actions の追跡Issueを更新して README の運用例を最新化。
 
 ---
 
@@ -148,3 +155,5 @@ docs/           # 仕様/設計/配色ほか
 ## 📜 ライセンス
 
 [MIT](LICENSE) © 2025 Imgponic contributors
+
+<!-- markdownlint-enable MD013 -->
