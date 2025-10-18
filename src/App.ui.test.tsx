@@ -1,10 +1,10 @@
-import test, { mock } from 'node:test'
 import assert from 'node:assert/strict'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react-dom/test-utils'
+import { afterEach, test, vi } from 'vitest'
 
 let JSDOMClass: (typeof import('jsdom'))['JSDOM'] | null = null
 try {
@@ -63,12 +63,12 @@ const noopStream = {
   isStreaming: false
 } as const
 
-test.afterEach(() => {
+afterEach(() => {
   appMockContainer.__APP_MOCKS__ = undefined
 })
 
 domTest('renders setup guidance banner when offline and retries on demand', async () => {
-  const retry = mock.fn(async () => {})
+  const retry = vi.fn(async () => {})
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({
       status: 'offline',
@@ -103,7 +103,7 @@ domTest('renders setup guidance banner when model is missing', async () => {
     useSetupCheck: () => ({
       status: 'missing-model',
       guidance: 'Install recommended model',
-      retry: mock.fn(async () => {})
+      retry: vi.fn(async () => {})
     }),
     useOllamaStream: () => ({
       ...noopStream

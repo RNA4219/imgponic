@@ -171,10 +171,10 @@ export const createDiffPreviewFlow = (callbacks: DiffPreviewCallbacks) => ({
 export default function App() {
   const [highContrast, setHighContrast] = useState<boolean>(false)
   const [typographyPreset, setTypographyPreset] = useState<TypographyPreset>('normal')
-  // 左右ペインのテキスト状態
-  const [leftText, setLeftText]   = useState<string>('ここに入力。Ollama整形は右の▶で実行。')
+  const INITIAL_LEFT_TEXT = 'ここに入力。Ollama整形は右の▶で実行。'
+  const [leftText, setLeftText] = useState<string>(INITIAL_LEFT_TEXT)
   const [rightText, setRightText] = useState<string>('（ここに整形結果が出ます）')
-  const [hasDangerWords, setHasDangerWords] = useState<boolean>(false)
+  const [hasDangerWords, setHasDangerWords] = useState<boolean>(() => containsDangerWords(INITIAL_LEFT_TEXT))
 
   // レシピ/モデル
   const [recipePath, setRecipePath] = useState('data/recipes/demo.sora2.yaml')
@@ -194,11 +194,15 @@ export default function App() {
   const [running, setRunning] = useState(false)
   const runBtnRef = useRef<HTMLButtonElement>(null)
   const leftTextRef = useRef<HTMLTextAreaElement>(null)
+  const corpusInputRef = useRef<HTMLInputElement>(null)
   const [sendSelectionOnly, setSendSelectionOnly] = useState<boolean>(false)
   const [leftSelection, setLeftSelection] = useState<string>('')
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
-  const leftHasDangerWord = useMemo(() => containsDangerWord(leftText), [leftText])
+  const updateLeftText = useCallback((value: string) => {
+    setLeftText(value)
+    setHasDangerWords(containsDangerWords(value))
+  }, [])
 
   const useOllamaStreamHook = resolveUseOllamaStreamHook()
   const { startStream, abortStream, isStreaming } = useOllamaStreamHook({
@@ -240,7 +244,8 @@ export default function App() {
   const [docExcerptError, setDocExcerptError] = useState<string | null>(null)
 
   const loadDocExcerpt = useCallback(async () => {
-    const trimmed = corpusRel.trim()
+    const currentValue = corpusInputRef.current?.value ?? corpusRel
+    const trimmed = currentValue.trim()
     if (!trimmed) {
       setDocExcerpt(null)
       setDocExcerptStatus('idle')
@@ -285,7 +290,7 @@ export default function App() {
       try {
         const ws = await invokeFn<Workspace | null>('read_workspace')
         if (ws) {
-          if (ws.left_text) setLeftText(ws.left_text)
+          if (ws.left_text) updateLeftText(ws.left_text)
           if (ws.right_text) setRightText(ws.right_text)
           if (ws.recipe_path) setRecipePath(ws.recipe_path)
           if (ws.model) setOllamaModel(ws.model)
@@ -296,7 +301,7 @@ export default function App() {
         console.warn('workspace load failed', e)
       }
     })()
-  }, [invokeFn])
+  }, [invokeFn, updateLeftText])
 
   // === Workspace: Autosave (debounced 800ms) ===
   const saveTimer = useRef<number | null>(null)
@@ -375,7 +380,17 @@ export default function App() {
   }, [isStreaming, composed, doCompose, startStream, ollamaModel])
 
   // 右→左 反映（プレビュー付き）
-  const diffFlow = useMemo(() => createDiffPreviewFlow({ readLeft: () => leftText, readRight: () => rightText, show: value => setDiffPatch(value), apply: value => setLeftText(value), close: () => setDiffPatch(null) }), [leftText, rightText])
+  const diffFlow = useMemo(
+    () =>
+      createDiffPreviewFlow({
+        readLeft: () => leftText,
+        readRight: () => rightText,
+        show: value => setDiffPatch(value),
+        apply: value => updateLeftText(value),
+        close: () => setDiffPatch(null)
+      }),
+    [leftText, rightText, updateLeftText]
+  )
   const { open: openDiffPreview, confirm: confirmDiffPreview, cancel: cancelDiffPreview } = diffFlow
 
   const rawUserInput = useMemo(
@@ -400,25 +415,25 @@ export default function App() {
     setLeftSelection(selectionStart === selectionEnd ? '' : value.slice(selectionStart, selectionEnd))
   }, [])
 
-  const handleLeftChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setLeftText(e.target.value)
-    handleLeftSelection(e.currentTarget)
-  }, [handleLeftSelection])
-
-  useEffect(() => {
-    setHasDangerWords(containsDangerWords(leftText))
-  }, [leftText])
+  const handleLeftChange = useCallback(
+    (event: React.FormEvent<HTMLTextAreaElement>) => {
+      const target = event.currentTarget
+      updateLeftText(target.value)
+      handleLeftSelection(target)
+    },
+    [handleLeftSelection, updateLeftText]
+  )
 
   // --- Project file helpers ---
   const openProjectToLeft = useCallback(async () => {
     if (!projRel) return
     try {
       const r = await invokeFn<{path:string, content:string}>('read_project_file', { relPath: projRel })
-      setLeftText(r.content)
+      updateLeftText(r.content)
     } catch (e:any) {
       alert('読み込み失敗: ' + String(e))
     }
-  }, [projRel, invokeFn])
+  }, [projRel, invokeFn, updateLeftText])
 
   const openProjectToRight = useCallback(async () => {
     if (!projRel) return
@@ -523,18 +538,14 @@ export default function App() {
       <div className="toolbar" style={{ gap: 12, margin: '12px 0' }}>
         <div className="badge">corpus/</div>
         <input
+          ref={corpusInputRef}
           data-testid="corpus-path-input"
           style={{ width: 320 }}
           value={corpusRel}
           onChange={e => setCorpusRel(e.target.value)}
           placeholder="lore/story.txt"
         />
-        <button
-          data-testid="load-excerpt-button"
-          className="btn"
-          onClick={loadDocExcerpt}
-          disabled={docExcerptStatus === 'loading' || !corpusRel.trim()}
-        >
+        <button data-testid="load-excerpt-button" className="btn" onClick={loadDocExcerpt}>
           抜粋読込
         </button>
         {docExcerptStatus === 'loading' && <span className="badge">読込中...</span>}
@@ -664,7 +675,14 @@ export default function App() {
             </span>
           </h3>
           <div className="area">
-            <textarea data-side="left" ref={leftTextRef} value={leftText} onSelect={e => handleLeftSelection(e.currentTarget)} onChange={handleLeftChange} />
+            <textarea
+              data-side="left"
+              ref={leftTextRef}
+              value={leftText}
+              onSelect={e => handleLeftSelection(e.currentTarget)}
+              onChange={handleLeftChange}
+              onInput={handleLeftChange}
+            />
           </div>
         </div>
 

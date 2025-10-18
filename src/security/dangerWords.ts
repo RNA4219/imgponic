@@ -11,3 +11,5 @@ export const containsDangerWords = (input: string): boolean => {
   const normalized = input.toLowerCase()
   return DANGER_WORDS.some(word => normalized.includes(word))
 }
+
+export const containsDangerWord = (input: string): boolean => containsDangerWords(input)

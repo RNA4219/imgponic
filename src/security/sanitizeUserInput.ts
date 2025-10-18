@@ -16,7 +16,7 @@ const MASK_PATTERNS: readonly MaskPattern[] = [
   },
   {
     type: 'PEM_KEY',
-    regex: /-----BEGIN (?:RSA|EC|PRIVATE) KEY-----[\s\S]+?-----END (?:RSA|EC|PRIVATE) KEY-----/g
+    regex: /-----BEGIN [^-]+-----[\s\S]+?-----END [^-]+-----/g
   },
   {
     type: 'GOOGLE_API_KEY',
