@@ -1,11 +1,34 @@
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use hex::encode;
 use sha2::{Digest, Sha256};
-use tempfile::tempdir_in;
+use tempfile::{tempdir, tempdir_in};
 
 pub use super::_compose_prompt;
+
+pub struct DataDirGuard {
+    prev: Option<OsString>,
+}
+
+impl DataDirGuard {
+    pub fn set(path: &Path) -> Self {
+        let prev = std::env::var_os("PROMPTFORGE_DATA_DIR");
+        std::env::set_var("PROMPTFORGE_DATA_DIR", path);
+        Self { prev }
+    }
+}
+
+impl Drop for DataDirGuard {
+    fn drop(&mut self) {
+        if let Some(ref value) = self.prev {
+            std::env::set_var("PROMPTFORGE_DATA_DIR", value);
+        } else {
+            std::env::remove_var("PROMPTFORGE_DATA_DIR");
+        }
+    }
+}
 
 fn ensure_corpus_dir() -> PathBuf {
     let base = PathBuf::from("corpus");
@@ -94,83 +117,70 @@ fn load_txt_excerpt_rejects_out_of_sandbox() {
 }
 
 mod compose_prompt_sandbox {
-    use super::*;
-    use serde_json::json;
-    use std::env;
+    use super::{DataDirGuard, _compose_prompt};
     use std::fs;
-    use std::path::PathBuf;
-    use std::sync::{Mutex, OnceLock};
-    use tempfile::tempdir;
+    use std::path::Path;
 
-    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
-    }
+    fn write_valid_fixture(base: &Path) -> String {
+        let recipes_dir = base.join("recipes");
+        let fragments_dir = base.join("fragments/system");
+        fs::create_dir_all(&recipes_dir).expect("failed to create recipes dir");
+        fs::create_dir_all(&fragments_dir).expect("failed to create fragments dir");
 
-    fn write_recipe(base: &PathBuf) {
-        fs::create_dir_all(base.join("recipes")).expect("create recipes dir");
         fs::write(
-            base.join("recipes/demo.yaml"),
-            r"profile: llama3
-fragments:
-  - system.prompt
-params:
-  user_input: Hello
-",
+            recipes_dir.join("ok.yaml"),
+            "profile: llama3\nfragments:\n  - system.prompt\n",
         )
-        .expect("write recipe");
-    }
+        .expect("failed to write recipe");
 
-    fn write_fragment(base: &PathBuf) {
-        fs::create_dir_all(base.join("fragments/system")).expect("create fragments dir");
         fs::write(
-            base.join("fragments/system/prompt.yaml"),
-            r"id: system.prompt
-kind: system
-content: |
-  Hi {{user_input}}
-",
+            fragments_dir.join("prompt.yaml"),
+            "id: system.prompt\nkind: system\ncontent: |\n  Hello\n",
         )
-        .expect("write fragment");
+        .expect("failed to write fragment");
+
+        recipes_dir.join("ok.yaml").to_string_lossy().to_string()
     }
 
     #[test]
-    fn compose_prompt_rejects_parent_escape() {
-        let _guard = env_lock();
-        let temp = tempdir().expect("create tempdir");
-        let base = temp.path().join("data_root");
-        fs::create_dir_all(base.join("fragments")).expect("create fragments root");
-        fs::create_dir_all(temp.path().join("outside/recipes")).expect("create outside recipes");
-        fs::write(
-            temp.path().join("outside/recipes/evil.yaml"),
-            "profile: llama3\nfragments: []\n",
-        )
-        .expect("write outside recipe");
+    fn compose_prompt_rejects_recipe_path_traversal() {
+        let temp = tempdir().expect("failed to create temp dir");
+        fs::create_dir_all(temp.path().join("recipes")).expect("failed to create recipes dir");
+        let _guard = DataDirGuard::set(temp.path());
 
-        env::set_var("PROMPTFORGE_DATA_DIR", base.to_str().unwrap());
-
-        let err = _compose_prompt("../outside/recipes/evil.yaml", None)
-            .expect_err("expected sandbox error");
+        let outside = temp.path().join("../escape.yaml");
+        let err =
+            _compose_prompt(outside.to_string_lossy().as_ref(), None).expect_err("expected error");
         assert_eq!(err.to_string(), "path out of sandbox");
-
-        env::remove_var("PROMPTFORGE_DATA_DIR");
     }
 
     #[test]
-    fn compose_prompt_accepts_in_sandbox_paths() {
-        let _guard = env_lock();
-        let temp = tempdir().expect("create tempdir");
-        let base = temp.path().join("data_root");
-        write_recipe(&base);
-        write_fragment(&base);
+    fn compose_prompt_rejects_fragment_path_traversal() {
+        let temp = tempdir().expect("failed to create temp dir");
+        let recipe_path = temp.path().join("recipes/attack.yaml");
+        fs::create_dir_all(recipe_path.parent().unwrap()).expect("failed to create recipes dir");
+        fs::create_dir_all(temp.path().join("fragments/system"))
+            .expect("failed to create fragments dir");
 
-        env::set_var("PROMPTFORGE_DATA_DIR", base.to_str().unwrap());
+        fs::write(
+            &recipe_path,
+            "profile: llama3\nfragments:\n  - system/../../evil\n",
+        )
+        .expect("failed to write recipe");
 
-        let result = _compose_prompt("recipes/demo.yaml", Some(json!({ "user_input": "World" })))
-            .expect("compose prompt succeeds");
-        assert!(result.final_prompt.contains("World"));
-        assert_eq!(result.model, "llama3");
+        let _guard = DataDirGuard::set(temp.path());
+        let err = _compose_prompt(recipe_path.to_string_lossy().as_ref(), None)
+            .expect_err("expected error");
+        assert_eq!(err.to_string(), "path out of sandbox");
+    }
 
-        env::remove_var("PROMPTFORGE_DATA_DIR");
+    #[test]
+    fn compose_prompt_allows_in_sandbox() {
+        let temp = tempdir().expect("failed to create temp dir");
+        let recipe_path = write_valid_fixture(temp.path());
+        let _guard = DataDirGuard::set(temp.path());
+
+        let result = _compose_prompt(&recipe_path, None).expect("compose prompt");
+        assert!(result.final_prompt.contains("Hello"));
     }
 }

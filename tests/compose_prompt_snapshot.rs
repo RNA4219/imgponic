@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-use promptforge::tests::_compose_prompt;
+use promptforge::tests::{DataDirGuard, _compose_prompt};
 
 fn env_lock() -> MutexGuard<'static, ()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -14,6 +14,8 @@ fn compose_prompt_snapshot() {
     let _guard = env_lock();
     let temp = tempfile::tempdir().expect("failed to create temp dir");
     let base = temp.path();
+
+    let _guard = DataDirGuard::set(base);
 
     let recipes_dir = base.join("recipes");
     let fragments_dir = base.join("fragments/system");

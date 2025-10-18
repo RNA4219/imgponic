@@ -101,11 +101,20 @@ fn _compose_prompt(
     recipe_path: &str,
     inline_params: Option<serde_json::Value>,
 ) -> Result<ComposeResult> {
-    let (configured_root, base_abs) = resolve_data_root()?;
-    let rp = PathBuf::from(recipe_path);
-    let resolved_recipe = resolve_under_base(&rp, &configured_root, &base_abs);
-    ensure_under(&base_abs, &resolved_recipe)?;
-    let recipe: Recipe = read_yaml(&resolved_recipe)?;
+    let sandbox = env::var_os("PROMPTFORGE_DATA_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("data"));
+
+    let rp_raw = PathBuf::from(recipe_path);
+    let rp = if rp_raw.is_absolute() || rp_raw.starts_with(&sandbox) {
+        rp_raw
+    } else {
+        sandbox.join(rp_raw)
+    };
+
+    ensure_under(&sandbox, &rp)?;
+
+    let recipe: Recipe = read_yaml(&rp)?;
 
     // merge params (inline override recipe.params)
     let mut params = recipe.params.clone();
@@ -121,10 +130,10 @@ fn _compose_prompt(
     // load fragments
     let mut blocks: Vec<String> = vec![];
     for frag_id in recipe.fragments.iter() {
-        let frag_path = base_abs
+        let frag_path = sandbox
             .join("fragments")
             .join(format!("{}.yaml", frag_id.replace('.', "/")));
-        ensure_under(&base_abs, &frag_path)?;
+        ensure_under(&sandbox, &frag_path)?;
         let frag: Fragment = read_yaml(&frag_path)
             .with_context(|| format!("Failed to read fragment: {}", frag_path.display()))?;
         let rendered = render_placeholders(&frag.content, &params);
