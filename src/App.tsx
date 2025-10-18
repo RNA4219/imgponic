@@ -204,7 +204,7 @@ export default function App() {
   const [leftSelection, setLeftSelection] = useState<string>('')
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
-  const responseBufferRef = useRef<string>('')
+  const streamedResponseRef = useRef<string>('')
   const updateLeftText = useCallback((value: string) => {
     setLeftText(value)
     setHasDangerWords(containsDangerWords(value))
@@ -212,7 +212,7 @@ export default function App() {
 
   const clearStreamedResponse = useCallback(
     (options?: { preserveRightText?: boolean }) => {
-      responseBufferRef.current = ''
+      streamedResponseRef.current = ''
       if (!options?.preserveRightText) {
         setRightText('')
       }
@@ -222,30 +222,28 @@ export default function App() {
 
   const appendStreamChunk = useCallback(
     (chunk: string) => {
-      responseBufferRef.current += chunk
-      setRightText(responseBufferRef.current)
+      streamedResponseRef.current += chunk
+      setRightText(streamedResponseRef.current)
     },
     [setRightText]
   )
 
-  const handleStreamEnd = useCallback(() => {
+  const handleStreamEnd = useCallback(async () => {
     setRunning(false)
-    const responseText = responseBufferRef.current
+    const responseText = streamedResponseRef.current
     const latestComposed = composedRef.current
-    void (async () => {
-      if (latestComposed) {
-        try {
-          await invokeFn('save_run', {
-            recipePath,
-            final_prompt: latestComposed.final_prompt,
-            response_text: responseText
-          })
-        } catch (error) {
-          console.error('save_run failed', error)
-        }
+    if (latestComposed) {
+      try {
+        await invokeFn('save_run', {
+          recipePath,
+          final_prompt: latestComposed.final_prompt,
+          response_text: responseText
+        })
+      } catch (error) {
+        console.warn('save_run failed', error)
       }
-      clearStreamedResponse({ preserveRightText: true })
-    })()
+    }
+    clearStreamedResponse({ preserveRightText: true })
   }, [clearStreamedResponse, invokeFn, recipePath])
 
   const handleStreamError = useCallback(
@@ -260,7 +258,9 @@ export default function App() {
 
   const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
     onChunk: appendStreamChunk,
-    onEnd: handleStreamEnd,
+    onEnd: () => {
+      void handleStreamEnd()
+    },
     onError: handleStreamError
   })
   const abortStream = useCallback(async () => {
