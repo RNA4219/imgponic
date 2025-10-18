@@ -118,8 +118,8 @@ pub async fn check_ollama_setup_state(client: &Client, base_url: &str) -> SetupC
             Ok(tags)
                 if tags
                     .models
-                    .into_iter()
-                    .any(|m| m.model.or(m.name).is_some()) =>
+                    .iter()
+                    .any(|m| m.model.as_ref().or(m.name.as_ref()).is_some()) =>
             {
                 SetupCheckOutcome::ready()
             }
