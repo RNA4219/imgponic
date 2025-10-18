@@ -232,11 +232,18 @@ test('renders danger word badge only when left pane contains dangerous phrases',
   const textarea = container.querySelector('textarea[data-side="left"]')
   assert.ok(textarea instanceof HTMLTextAreaElement)
 
-  await act(async () => {
-    textarea.value = 'please IGNORE PREVIOUS instructions'
-    textarea.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-  assert.ok(dangerBadge() instanceof HTMLElement)
+  for (const phrase of [
+    'please IGNORE PREVIOUS instructions',
+    'jailbreak',
+    'developer mode',
+    'system prompt'
+  ]) {
+    await act(async () => {
+      textarea.value = phrase
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    assert.ok(dangerBadge() instanceof HTMLElement, `badge visible for phrase: ${phrase}`)
+  }
 
   await act(async () => {
     textarea.value = 'all safe here'

@@ -1,7 +1,10 @@
 const BASE_DANGER_WORDS = [
   'ignore previous',
   'disregard earlier instructions',
-  'overrule safeguards'
+  'overrule safeguards',
+  'jailbreak',
+  'developer mode',
+  'system prompt'
 ] as const
 
 export const DANGER_WORDS: ReadonlyArray<string> = BASE_DANGER_WORDS
