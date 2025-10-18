@@ -426,13 +426,21 @@ test('diff preview requires approval before applying', () => {
   expect(patches).toHaveLength(2)
 })
 
-test('buildUnifiedDiff delegates to diff library for unified patch', () => {
-  const sentinel = '--- sentinel diff ---'
-  const spy = vi.spyOn(diffModule, 'createTwoFilesPatch').mockReturnValue(sentinel)
+test('buildUnifiedDiff formats unified diff output from library', () => {
+  const libraryOutput = [
+    '===================================================================',
+    '--- sentinel left',
+    '+++ sentinel right',
+    '@@ -1,1 +1,1 @@',
+    '-before',
+    '+after',
+    ''
+  ].join('\n')
+  const spy = vi.spyOn(diffModule, 'createTwoFilesPatch').mockReturnValue(libraryOutput)
 
   try {
     const result = buildUnifiedDiff('before\nline', 'after\nline')
-    expect(result).toBe(sentinel)
+    expect(result).toBe(['--- sentinel left', '+++ sentinel right', '@@ -1,1 +1,1 @@', '-before', '+after'].join('\n'))
     expect(spy).toHaveBeenCalledTimes(1)
     expect(spy).toHaveBeenCalledWith('左', '右', 'before\nline', 'after\nline', '', '', { context: 3 })
   } finally {

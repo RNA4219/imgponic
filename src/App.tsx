@@ -157,7 +157,15 @@ export const buildUnifiedDiff = (before: string, after: string): string => {
   if (before === after) {
     return ['--- 左', '+++ 右', '@@', '  (差分はありません)'].join('\n')
   }
-  return createTwoFilesPatch('左', '右', before, after, '', '', { context: 3 })
+  const patch = createTwoFilesPatch('左', '右', before, after, '', '', { context: 3 })
+  const lines = patch.split('\n')
+  if (lines.length > 0 && lines[0] === '===================================================================') {
+    lines.shift()
+  }
+  while (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop()
+  }
+  return lines.join('\n')
 }
 
 export const createDiffPreviewFlow = (callbacks: DiffPreviewCallbacks) => ({
