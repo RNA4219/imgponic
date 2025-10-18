@@ -10,18 +10,22 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
+    "lint": "eslint src/App.tsx src/useOllamaStream.ts src/useSetupCheck.ts src/useSetupCheck.test.ts",
     "test": "vitest --run --environment jsdom",
     "test:node": "node --import tsx --test src/App.ui.test.tsx"
   },
   "dependencies": {
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-clipboard-manager": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.0.0",
+    "@tauri-apps/plugin-fs": "^2.0.0"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
-    "@tauri-apps/api": "^1.5.4",
-    "@tauri-apps/cli": "^1.5.12",
+    "@tauri-apps/cli": "^2.0.0",
     "@types/diff": "^5.0.5",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",

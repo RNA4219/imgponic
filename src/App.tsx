@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { invoke } from '@tauri-apps/api/tauri'
-import { writeText } from '@tauri-apps/api/clipboard'
-import { save } from '@tauri-apps/api/dialog'
-import { writeTextFile } from '@tauri-apps/api/fs'
+import { invoke } from '@tauri-apps/api/core'
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { save } from '@tauri-apps/plugin-dialog'
+import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { containsDangerWords } from './security/dangerWords'
 import { useOllamaStream } from './useOllamaStream'
 import { useSetupCheck } from './useSetupCheck'
@@ -401,7 +401,7 @@ export default function App() {
       setRunning(false)
       setOllamaError(describeOllamaError(error))
     }
-  }, [isStreaming, composed, doCompose, startStream, ollamaModel, clearStreamedResponse])
+  }, [isStreaming, composed, doCompose, startStream, ollamaModel, clearStreamedResponse, resetOllamaError])
 
   // 右→左 反映（プレビュー付き）
   const diffFlow = useMemo(
@@ -452,10 +452,10 @@ export default function App() {
   const openProjectToLeft = useCallback(async () => {
     if (!projRel) return
     try {
-      const r = await invokeFn<{path:string, content:string}>('read_project_file', { relPath: projRel })
+      const r = await invokeFn<{ path: string; content: string }>('read_project_file', { relPath: projRel })
       updateLeftText(r.content)
-    } catch (e:any) {
-      alert('読み込み失敗: ' + String(e))
+    } catch (error: unknown) {
+      alert('読み込み失敗: ' + String(error))
     }
   }, [projRel, invokeFn, updateLeftText])
 
