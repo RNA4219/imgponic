@@ -325,14 +325,37 @@ fn save_run(
 // ---------- Sandbox helpers ----------
 fn ensure_under(base: &Path, target: &Path) -> Result<(), io::Error> {
     let base = base.canonicalize()?;
-    let target = target.canonicalize()?;
-    if !target.starts_with(&base) {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
-            "path out of sandbox",
-        ));
+    let permission_error =
+        || io::Error::new(io::ErrorKind::PermissionDenied, "path out of sandbox");
+    match target.canonicalize() {
+        Ok(target) => {
+            if target.starts_with(&base) {
+                Ok(())
+            } else {
+                Err(permission_error())
+            }
+        }
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            let mut ancestor = target;
+            while let Some(parent) = ancestor.parent() {
+                match parent.canonicalize() {
+                    Ok(parent) => {
+                        if parent.starts_with(&base) {
+                            return Ok(());
+                        }
+                        return Err(permission_error());
+                    }
+                    Err(parent_err) if parent_err.kind() == io::ErrorKind::NotFound => {
+                        ancestor = parent;
+                        continue;
+                    }
+                    Err(parent_err) => return Err(parent_err),
+                }
+            }
+            Err(err)
+        }
+        Err(err) => Err(err),
     }
-    Ok(())
 }
 
 // ---------- Project file I/O ----------
@@ -429,6 +452,11 @@ struct Workspace {
 #[cfg(test)]
 pub mod workspace_test_support {
     pub use super::{workspace_path, write_workspace, Workspace};
+}
+
+#[cfg(test)]
+pub mod project_test_support {
+    pub use super::{read_project_file, write_project_file, FileContent};
 }
 
 fn workspace_path(app: &tauri::AppHandle) -> PathBuf {
