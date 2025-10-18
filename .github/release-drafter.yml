@@ -1,0 +1,42 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+change-template: '- $TITLE (#$NUMBER)'
+no-changes-template: '- 変更はありません'
+categories:
+  - title: '🚀 機能'
+    labels:
+      - feature
+      - enhancement
+  - title: '🐛 修正'
+    labels:
+      - bug
+      - fix
+      - bugfix
+  - title: '🧰 メンテナンス'
+    labels:
+      - chore
+      - maintenance
+      - refactor
+  - title: '🧪 テスト'
+    labels:
+      - test
+      - tests
+version-resolver:
+  major:
+    labels:
+      - semver:major
+  minor:
+    labels:
+      - semver:minor
+  patch:
+    labels:
+      - semver:patch
+  default: patch
+template: |
+  ## 変更点
+  $CHANGES
+
+  ## 貢献者
+  $CONTRIBUTORS
+
+  _自動生成: Release Drafter_
