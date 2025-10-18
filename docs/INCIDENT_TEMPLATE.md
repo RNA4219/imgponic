@@ -7,6 +7,7 @@ blueprint: ../Day8/workflow-cookbook/BLUEPRINT.md
 evaluation: ../Day8/workflow-cookbook/EVALUATION.md
 ---
 
+<!-- markdownlint-configure-file { "MD025": { "front_matter_title": "" } } -->
 # インシデントレポート テンプレート
 
 <!-- markdownlint-disable MD013 -->
