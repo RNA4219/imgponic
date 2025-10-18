@@ -117,9 +117,9 @@ export const composePromptWithSelection = async (
 ): Promise<ComposeResult> => {
   const rawUserInput = determineUserInput(sendSelectionOnly, selection, leftText, selectionStart, selectionEnd, contextRadius)
   const sanitized = sanitizeUserInput(rawUserInput)
-  onSanitized?.({ ...sanitized, raw: rawUserInput })
-  const userInput = sanitized.overLimit ? rawUserInput : sanitized.sanitized
-  const res = await invokeFn('compose_prompt', { recipePath, inlineParams: { ...params, user_input: userInput } })
+  const sanitizedText = sanitized.sanitized
+  onSanitized?.({ ...sanitized, sanitized: sanitizedText, raw: rawUserInput })
+  const res = await invokeFn('compose_prompt', { recipePath, inlineParams: { ...params, user_input: sanitizedText } })
   return res as ComposeResult
 }
 
@@ -218,44 +218,14 @@ export default function App() {
     setHasDangerWords(containsDangerWords(value))
   }, [])
 
-  const clearStreamedResponse = useCallback(
-    (options?: { preserveRightText?: boolean }) => {
-      streamedResponseRef.current = ''
-      if (!options?.preserveRightText) {
-        setRightText('')
-      }
-    },
-    [setRightText]
-  )
+  const clearStreamedResponse = useCallback(() => {
+    setRightText('')
+  }, [])
 
-  const appendStreamChunk = useCallback(
-    (chunk: string) => {
-      streamedResponseRef.current += chunk
-      setRightText(streamedResponseRef.current)
-    },
-    [setRightText]
-  )
-
-  const handleStreamEnd = useCallback(async () => {
-    setRunning(false)
-    const responseText = streamedResponseRef.current
-    const latestComposed = composedRef.current
-    if (latestComposed) {
-      try {
-        await invokeFn('save_run', {
-          recipePath,
-          final_prompt: latestComposed.final_prompt,
-          response_text: responseText
-        })
-      } catch (error) {
-        console.warn('save_run failed', error)
-      }
-    }
-    clearStreamedResponse({ preserveRightText: true })
-  }, [clearStreamedResponse, invokeFn, recipePath])
-
-  const handleStreamError = useCallback(
-    (message: string) => {
+  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
+    onChunk: chunk => setRightText(prev => prev + chunk),
+    onEnd: () => setRunning(false),
+    onError: message => {
       console.error('ollama stream error', message)
       setRunning(false)
       setOllamaError(describeOllamaError(message))
