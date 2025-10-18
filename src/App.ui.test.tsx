@@ -215,6 +215,90 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
   }
 })
 
+domTest('aborting stream resets ollama error and calls abort once', async () => {
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const rawAbortStream = vi.fn(async () => {})
+  const startStreamImpl = vi.fn(async () => {
+    throw new Error('network dropped')
+  })
+
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({
+      status: 'ready',
+      guidance: '',
+      retry: vi.fn(async () => {})
+    }),
+    useOllamaStream: handlers => {
+      const [streaming, setStreaming] = React.useState(false)
+      const startStream = React.useCallback(async () => {
+        setStreaming(true)
+        await startStreamImpl()
+      }, [startStreamImpl])
+      const abortStream = React.useCallback(async () => {
+        setStreaming(false)
+        await rawAbortStream()
+      }, [rawAbortStream])
+      return {
+        startStream,
+        abortStream,
+        appendChunk: handlers.onChunk ?? (() => {}),
+        isStreaming: streaming
+      }
+    },
+    invoke: async (cmd: string) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  try {
+    await act(async () => {
+      root.render(<App />)
+    })
+
+    const runButton = container.querySelector('.runpulse')
+    expect(runButton).toBeInstanceOf(HTMLButtonElement)
+    if (!(runButton instanceof HTMLButtonElement)) throw new Error('Expected run button')
+
+    await act(async () => {
+      runButton.click()
+    })
+    await flushEffects()
+
+    expect(startStreamImpl).toHaveBeenCalledTimes(1)
+
+    const errorBannerBefore = container.querySelector('[data-testid="ollama-error-banner"]')
+    expect(errorBannerBefore).toBeInstanceOf(HTMLElement)
+
+    const stopButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('停止'))
+    expect(stopButton).toBeInstanceOf(HTMLButtonElement)
+    if (!(stopButton instanceof HTMLButtonElement)) throw new Error('Expected stop button')
+
+    expect(rawAbortStream).not.toHaveBeenCalled()
+
+    await act(async () => {
+      stopButton.click()
+    })
+    await flushEffects()
+
+    expect(rawAbortStream).toHaveBeenCalledTimes(1)
+    expect(container.querySelector('[data-testid="ollama-error-banner"]')).toBeNull()
+  } finally {
+    consoleError.mockRestore()
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  }
+})
+
 test('determineUserInput returns selection context with line range header', () => {
   const leftText = Array.from({ length: 12 }, (_, idx) => `line-${idx + 1}`).join('\n')
   const selection = 'line-6'
