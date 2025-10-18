@@ -1,7 +1,6 @@
-import React from 'react'
-import { act } from 'react-dom/test-utils'
+import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { invoke } from '@tauri-apps/api/tauri'
 
@@ -59,6 +58,10 @@ const renderHook = async (model: string): Promise<RenderHookResult> => {
 }
 
 describe('useSetupCheck', () => {
+  beforeAll(() => {
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
   })
