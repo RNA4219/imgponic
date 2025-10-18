@@ -38,6 +38,13 @@
 | warning | `#E4B200` | 注意 |
 | danger | `#E97777` | 警告/エラー |
 
+### 1.3 タイポグラフィ関連トークン
+
+| Token | 値 | 用途 |
+|---|---|---|
+| text-letter-spacing | `0.01em` | ベース本文の字間調整（読みやすさの確保） |
+| text-line-height | `1.6` | ベース本文の行間（WCAG 読みやすさ基準の維持） |
+
 ## 2. タイポグラフィ（推奨）
 
 - ベース: `ui-sans-serif, system-ui, "Segoe UI", Roboto, "Noto Sans JP"`
@@ -64,6 +71,13 @@
 - アクセント上のテキストは `accent-800` 以上を推奨（濃い文字）
 - 文字サイズ12–14pxでは **WCAG AA（4.5:1）** を満たすよう組み合わせること
 
+### 4.1 高コントラストモード指針
+
+- 推奨配色: 背景 `#0B0B0B`、本文 `#FFFFFF`、強調 `#FFD447`、リンク `#7CD57C`（コントラスト比 7:1 以上）
+- 適用クラス: `body.high-contrast` をルートに付与し、配下コンポーネントは `body.high-contrast .btn` など状態別セレクタで上書きする
+- アクセシビリティ整合: 高コントラスト時も `--text-letter-spacing` と `--text-line-height` を共有し、視認性基準（WCAG 2.1 AA）を保持する
+- 配色変更はフォーカスインジケータを `outline: 3px solid #FFD447` 程度に強調し、キーボード操作での判別を担保する
+
 ## 5. 実装トークン（CSS変数例）
 
 ```css
@@ -87,6 +101,23 @@
   --border: #D9D9CA;
   --panel: #FFFFFD;
   --shadow: rgba(0,0,0,0.10);
+  --text-letter-spacing: 0.01em;
+  --text-line-height: 1.6;
+}
+
+body.high-contrast {
+  --bg: #0B0B0B;
+  --ink: #FFFFFF;
+  --accent-400: #FFD447;
+  --accent-700: #7CD57C;
+  outline-color: #FFD447;
+  letter-spacing: var(--text-letter-spacing);
+  line-height: var(--text-line-height);
+}
+
+body.high-contrast .btn {
+  background: var(--accent-400);
+  color: var(--ink);
 }
 ```
 
