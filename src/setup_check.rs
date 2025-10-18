@@ -25,20 +25,33 @@ mod tests {
         (handle, format!("http://{}", addr))
     }
 
-    async fn assert_status(body: &'static str, expected: SetupStatus) {
+    async fn assert_status(
+        body: &'static str,
+        required_model: Option<&str>,
+        expected: SetupStatus,
+    ) {
         let (server, base_url) = spawn_json_server(body).await;
-        let result = check_ollama_setup_state(&Client::new(), &base_url).await;
+        let result = check_ollama_setup_state(&Client::new(), &base_url, required_model).await;
         server.await.unwrap();
         assert_eq!(result.status, expected);
     }
 
     #[tokio::test]
     async fn validates_responses() {
-        for (body, expected) in [
-            (r#"{"models":[{"model":"llama2"}]}"#, SetupStatus::Ready),
-            (r#"{"models":[]}"#, SetupStatus::ModelMissing),
+        for (body, required_model, expected) in [
+            (
+                r#"{"models":[{"model":"llama2"}]}"#,
+                Some("llama2"),
+                SetupStatus::Ready,
+            ),
+            (
+                r#"{"models":[{"model":"phi"}]}"#,
+                Some("llama2"),
+                SetupStatus::ModelMissing,
+            ),
+            (r#"{"models":[]}"#, None, SetupStatus::ModelMissing),
         ] {
-            assert_status(body, expected).await;
+            assert_status(body, required_model, expected).await;
         }
         let port = {
             let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -48,7 +61,9 @@ mod tests {
         };
         let url = format!("http://127.0.0.1:{}", port);
         assert_eq!(
-            check_ollama_setup_state(&Client::new(), &url).await.status,
+            check_ollama_setup_state(&Client::new(), &url, None)
+                .await
+                .status,
             SetupStatus::ServerUnavailable
         );
     }
@@ -111,19 +126,33 @@ struct TaggedModel {
     name: Option<String>,
 }
 
-pub async fn check_ollama_setup_state(client: &Client, base_url: &str) -> SetupCheckOutcome {
+pub async fn check_ollama_setup_state(
+    client: &Client,
+    base_url: &str,
+    required_model: Option<&str>,
+) -> SetupCheckOutcome {
     let url = format!("{}/api/tags", base_url.trim_end_matches('/'));
     match client.get(url).send().await {
         Ok(resp) if resp.status().is_success() => match resp.json::<TagsResponse>().await {
-            Ok(tags)
-                if tags
+            Ok(tags) => {
+                let has_any_model = tags
                     .models
                     .iter()
-                    .any(|m| m.model.as_ref().or(m.name.as_ref()).is_some()) =>
-            {
-                SetupCheckOutcome::ready()
+                    .any(|m| m.model.as_ref().or(m.name.as_ref()).is_some());
+                if let Some(required) = required_model {
+                    let has_required_model = tags.models.iter().any(|m| {
+                        m.model.as_deref() == Some(required) || m.name.as_deref() == Some(required)
+                    });
+                    if !has_required_model {
+                        return SetupCheckOutcome::model_missing();
+                    }
+                }
+                if has_any_model {
+                    SetupCheckOutcome::ready()
+                } else {
+                    SetupCheckOutcome::model_missing()
+                }
             }
-            Ok(_) => SetupCheckOutcome::model_missing(),
             Err(_) => SetupCheckOutcome::server_unavailable(),
         },
         _ => SetupCheckOutcome::server_unavailable(),
@@ -131,8 +160,11 @@ pub async fn check_ollama_setup_state(client: &Client, base_url: &str) -> SetupC
 }
 
 #[tauri::command]
-pub async fn check_ollama_setup(base_url: Option<String>) -> Result<SetupCheckOutcome, String> {
+pub async fn check_ollama_setup(
+    base_url: Option<String>,
+    model: Option<String>,
+) -> Result<SetupCheckOutcome, String> {
     let client = Client::new();
     let url = base_url.unwrap_or_else(|| DEFAULT_OLLAMA_URL.to_string());
-    Ok(check_ollama_setup_state(&client, &url).await)
+    Ok(check_ollama_setup_state(&client, &url, model.as_deref()).await)
 }
