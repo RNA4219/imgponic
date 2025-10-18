@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod ollama_stream;
+mod txt_excerpt;
 
 #[cfg(test)]
 mod tests;
@@ -430,6 +431,15 @@ fn write_project_file(rel_path: String, content: String) -> Result<String, Strin
     Ok(p.display().to_string())
 }
 
+// ---------- Corpus excerpts ----------
+#[tauri::command]
+fn load_txt_excerpt(
+    path: String,
+    max_bytes: Option<u64>,
+) -> Result<txt_excerpt::TxtExcerpt, String> {
+    txt_excerpt::load_txt_excerpt(&path, max_bytes)
+}
+
 // ---------- Workspace persistence ----------
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct Workspace {
@@ -513,6 +523,7 @@ fn main() {
             list_project_files,
             read_project_file,
             write_project_file,
+            load_txt_excerpt,
             read_workspace,
             write_workspace
         ])
