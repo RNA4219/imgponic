@@ -67,6 +67,7 @@ fn read_prompt_file_requires_sandbox() {
 
     fs::create_dir_all("prompts/system").expect("create system dir");
     fs::write("prompts/system/sample.txt", "system text").expect("write sample");
+    fs::write("outside.txt", "intruder").expect("write outside file");
 
     let file = read_prompt_file("system/sample.txt".into()).expect("read prompt");
     assert_eq!(file.content, "system text");
