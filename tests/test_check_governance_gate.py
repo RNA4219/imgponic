@@ -89,16 +89,18 @@ def test_collect_changed_paths_fallback(monkeypatch: pytest.MonkeyPatch) -> None
     assert calls[-1][-1] == "HEAD"
 
 
-def test_main_requires_pr_body(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_main_skips_when_pr_body_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     monkeypatch.setenv("GITHUB_EVENT_PATH", str(tmp_path / "event.json"))
     monkeypatch.setattr(check_governance_gate, "collect_changed_paths", lambda: [])
-    monkeypatch.setattr(
-        check_governance_gate,
-        "load_forbidden_patterns",
-        lambda *_: [],
-    )
+    monkeypatch.setattr(check_governance_gate, "load_forbidden_patterns", lambda *_: [])
 
-    assert check_governance_gate.main(()) == 1
+    assert check_governance_gate.main(()) == 0
+    captured = capsys.readouterr()
+    assert "Skipping PR body validation" in captured.err
 
 
 def test_main_accepts_pr_body_env(
