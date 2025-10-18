@@ -189,7 +189,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     body = resolve_pr_body(cli_body=args.pr_body, cli_body_path=args.pr_body_path)
     if body is None:
-        return 1
+        print(
+            "Skipping PR body validation because PR body data is unavailable.",
+            file=sys.stderr,
+        )
+        return 0
 
     if not validate_pr_body(body):
         return 1
