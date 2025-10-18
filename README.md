@@ -94,8 +94,9 @@ README.md       # 本ドキュメント
 data/           # レシピ/フラグメント
 project/        # 編集対象（サンドボックス）
 runs/<ts>/      # 実行ログ
-src/            # React + Rust（Tauriバックエンド、エントリは src/main.rs）
-src/main.rs     # Rust エントリポイント
+src/            # フロント（React/TypeScript）とバックエンド（Rust）が共存
+src/main.rs     # Rust エントリポイント（Tauriコマンドもここから起動）
+src/main.tsx    # React エントリポイント
 scripts/*.bat   # 起動/ビルド補助
 docs/           # 仕様/設計/配色ほか
 icons/          # アプリ用アイコン
@@ -112,8 +113,9 @@ tools/          # 補助スクリプト群
 data/           # レシピ/フラグメント
 project/        # 編集対象（サンドボックス）
 runs/<ts>/      # 実行ログ
-src/            # React + Rust（Tauriバックエンド、エントリは src/main.rs）
-src/main.rs     # Rust エントリポイント
+src/            # フロント（React/TypeScript）とバックエンド（Rust）が共存
+  ├─ main.rs    # Rust エントリポイント（Tauriコマンドもここから起動）
+  └─ main.tsx   # React エントリポイント
 scripts/*.bat   # 起動/ビルド補助
 docs/           # 仕様/設計/配色ほか
 icons/          # アプリ用アイコン
