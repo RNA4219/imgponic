@@ -26,3 +26,7 @@ tauri-build = { version = "2", features = [] }
 [dev-dependencies]
 insta = "1"
 tempfile = "3"
+
+[[test]]
+name = "glib_stack"
+path = "tests/security/glib_stack.rs"
