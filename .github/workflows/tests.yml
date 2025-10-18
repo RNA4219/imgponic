@@ -32,7 +32,21 @@ jobs:
         run: npm run build
 
       - name: Run frontend tests
-        run: npm run test
+        env:
+          CI: 'true'
+        run: |
+          mkdir -p artifacts
+          set -o pipefail
+          npx vitest --run --environment jsdom --reporter=verbose --reporter=junit --outputFile artifacts/vitest-junit.xml | tee artifacts/vitest.log
+
+      - name: Upload vitest artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-artifacts
+          path: |
+            artifacts/vitest.log
+            artifacts/vitest-*
 
   rust:
     runs-on: ubuntu-latest
