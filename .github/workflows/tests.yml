@@ -11,11 +11,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Detect Node.js lockfile
+        id: npm_lock
+        run: |
+          if ls package-lock.json npm-shrinkwrap.json yarn.lock >/dev/null 2>&1; then
+            echo "has_lock=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "has_lock=false" >>"$GITHUB_OUTPUT"
+          fi
+      - name: Set up Node.js (cached)
+        if: steps.npm_lock.outputs.has_lock == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+      - name: Set up Node.js
+        if: steps.npm_lock.outputs.has_lock != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - name: Install Node.js dependencies
         run: npm install
       - name: Lint TypeScript sources
