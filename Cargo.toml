@@ -30,3 +30,7 @@ tempfile = "3"
 [[test]]
 name = "glib_stack"
 path = "tests/security/glib_stack.rs"
+
+[patch.crates-io]
+tao = { git = "https://github.com/conradhale/tao", branch = "dev" }
+wry = { git = "https://github.com/conradhale/wry", branch = "dev" }
