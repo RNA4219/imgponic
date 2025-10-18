@@ -44,7 +44,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
 
   format:
@@ -73,7 +73,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
 
   typecheck:
@@ -102,7 +102,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
 
   unit:
@@ -187,7 +187,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
 
   security:
@@ -212,7 +212,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
 
   coverage:
@@ -241,7 +241,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
 
   build:
@@ -279,7 +279,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
 
   e2e:
@@ -310,7 +310,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-logs
+          name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
 
   report:
@@ -319,7 +319,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: test-logs
+          pattern: test-logs-*
           path: logs
       - name: Summarize & STRICT gate (optional)
         run: |
