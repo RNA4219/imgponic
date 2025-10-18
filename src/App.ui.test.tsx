@@ -1,9 +1,15 @@
-import test from 'node:test'
+import test, { mock } from 'node:test'
 import assert from 'node:assert/strict'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import { composePromptWithSelection, createDiffPreviewFlow, determineUserInput } from './App'
-import KeybindOverlay, { KEYBIND_SHORTCUTS, resolveKeybindOverlayState } from './KeybindOverlay'
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import { act } from 'react-dom/test-utils'
+
+import * as tauriModule from '@tauri-apps/api/tauri'
+
+import App, { composePromptWithSelection, createDiffPreviewFlow, determineUserInput } from './App'
+import * as streamModule from './useOllamaStream'
 
 test('determineUserInput returns selection context with line range header', () => {
   const leftText = Array.from({ length: 12 }, (_, idx) => `line-${idx + 1}`).join('\n')
@@ -117,4 +123,72 @@ test('keybind overlay lists primary shortcuts from spec link', () => {
     KEYBIND_SHORTCUTS.map(item => item.keys),
     ['Ctrl/Cmd+Enter', 'Ctrl/Cmd+S', 'Ctrl/Cmd+C', '? / Esc']
   )
+})
+
+test('loads corpus excerpt, injects into compose params, and renders preview metadata', async () => {
+  const composeCalls: Array<Record<string, unknown>> = []
+  const invokeMock = mock.method(tauriModule, 'invoke', async (cmd: string, args?: Record<string, unknown>) => {
+    if (cmd === 'read_workspace') return null
+    if (cmd === 'write_workspace') return 'ok'
+    if (cmd === 'load_txt_excerpt') {
+      assert.ok(args)
+      return {
+        path: String(args?.path ?? ''),
+        excerpt: '頭 75% ... 尾 25%',
+        sha256: 'deadbeefcafebabe',
+        truncated: true,
+        size_bytes: 1200,
+        used_bytes: 400
+      }
+    }
+    if (cmd === 'compose_prompt') {
+      composeCalls.push(args ?? {})
+      return { final_prompt: 'prompt', sha256: 'hash', model: 'm' }
+    }
+    if (cmd === 'run_ollama_stream') return undefined
+    return undefined
+  })
+  const streamMock = mock.method(streamModule, 'useOllamaStream', () => ({
+    startStream: async () => {},
+    abortStream: async () => {},
+    appendChunk: () => {},
+    isStreaming: false
+  }))
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+  await act(async () => { root.render(<App />) })
+
+  const pathInput = container.querySelector('[data-testid="corpus-path-input"]')
+  assert.ok(pathInput instanceof HTMLInputElement)
+  await act(async () => {
+    pathInput.value = 'corpus/story.txt'
+    pathInput.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+
+  const loadButton = container.querySelector('[data-testid="load-excerpt-button"]')
+  assert.ok(loadButton instanceof HTMLButtonElement)
+  await act(async () => { loadButton.click() })
+  await act(async () => { await Promise.resolve() })
+
+  const preview = container.querySelector('[data-testid="excerpt-preview"]')
+  assert.ok(preview instanceof HTMLElement)
+  const previewText = preview.textContent ?? ''
+  assert.ok(previewText.includes('deadbeefcafebabe'))
+  assert.ok(previewText.includes('400 / 1200'))
+  assert.ok(previewText.toLowerCase().includes('truncated'))
+
+  const runButton = container.querySelector('.runpulse')
+  assert.ok(runButton instanceof HTMLButtonElement)
+  await act(async () => { runButton.click() })
+  await act(async () => { await Promise.resolve() })
+
+  assert.equal(composeCalls.length, 1)
+  const inlineParams = (composeCalls[0].inlineParams ?? {}) as Record<string, unknown>
+  assert.equal(inlineParams.doc_excerpt, '頭 75% ... 尾 25%')
+
+  await act(async () => { root.unmount() })
+  container.remove()
+  invokeMock.restore()
+  streamMock.restore()
 })

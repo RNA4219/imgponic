@@ -10,6 +10,15 @@ import KeybindOverlay, { resolveKeybindOverlayState } from './KeybindOverlay'
 export type ComposeResult = { final_prompt: string; sha256: string; model: string }
 type InvokeFunction = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
+type DocExcerpt = {
+  path: string
+  excerpt: string
+  sha256: string
+  truncated: boolean
+  size_bytes: number
+  used_bytes: number
+}
+
 const ACCESSIBILITY_STORAGE_KEYS = {
   highContrast: 'accessibility:highContrast',
   typography: 'accessibility:typography'
@@ -186,6 +195,50 @@ export default function App() {
 
   // プロジェクトファイルパス（project/ 内相対）
   const [projRel, setProjRel] = useState('src/example.py')
+  const [corpusRel, setCorpusRel] = useState('')
+  const [docExcerpt, setDocExcerpt] = useState<DocExcerpt | null>(null)
+  const [docExcerptStatus, setDocExcerptStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [docExcerptError, setDocExcerptError] = useState<string | null>(null)
+
+  const loadDocExcerpt = useCallback(async () => {
+    const trimmed = corpusRel.trim()
+    if (!trimmed) {
+      setDocExcerpt(null)
+      setDocExcerptStatus('idle')
+      setDocExcerptError(null)
+      setParams(prev => {
+        if ('doc_excerpt' in prev) {
+          const next = { ...prev }
+          delete (next as Record<string, unknown>).doc_excerpt
+          return next
+        }
+        return prev
+      })
+      return
+    }
+    setDocExcerptStatus('loading')
+    setDocExcerptError(null)
+    try {
+      const result = await invoke<DocExcerpt>('load_txt_excerpt', { path: trimmed })
+      setDocExcerpt(result)
+      setDocExcerptStatus('success')
+      setParams(prev => ({ ...prev, doc_excerpt: result.excerpt }))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error ?? '')
+      setDocExcerpt(null)
+      setDocExcerptStatus('error')
+      setDocExcerptError(message)
+      setParams(prev => {
+        if ('doc_excerpt' in prev) {
+          const next = { ...prev }
+          delete (next as Record<string, unknown>).doc_excerpt
+          return next
+        }
+        return prev
+      })
+      alert('抜粋読込失敗: ' + message)
+    }
+  }, [corpusRel])
 
   // === Workspace: Restore on startup ===
   useEffect(() => {
@@ -406,6 +459,55 @@ export default function App() {
         <button className="btn" onClick={saveLeftToProject}>左を保存（Ctrl/Cmd+S）</button>
         <button className="btn" onClick={saveRightToProject}>右を保存</button>
       </div>
+
+      <div className="toolbar" style={{ gap: 12, margin: '12px 0' }}>
+        <div className="badge">corpus/</div>
+        <input
+          data-testid="corpus-path-input"
+          style={{ width: 320 }}
+          value={corpusRel}
+          onChange={e => setCorpusRel(e.target.value)}
+          placeholder="lore/story.txt"
+        />
+        <button
+          data-testid="load-excerpt-button"
+          className="btn"
+          onClick={loadDocExcerpt}
+          disabled={docExcerptStatus === 'loading' || !corpusRel.trim()}
+        >
+          抜粋読込
+        </button>
+        {docExcerptStatus === 'loading' && <span className="badge">読込中...</span>}
+        {docExcerptStatus === 'success' && <span className="badge">読込済</span>}
+        {docExcerptStatus === 'error' && <span className="badge">読込失敗</span>}
+      </div>
+
+      {docExcerpt && (
+        <div
+          data-testid="excerpt-preview"
+          style={{
+            background: '#f4f4f4',
+            color: '#222',
+            padding: 12,
+            borderRadius: 4,
+            marginBottom: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8
+          }}
+        >
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 12 }}>
+            <span>SHA-256: {docExcerpt.sha256}</span>
+            <span>Bytes: {docExcerpt.used_bytes} / {docExcerpt.size_bytes}</span>
+            <span>TRUNCATED: {docExcerpt.truncated ? 'YES' : 'NO'}</span>
+          </div>
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{docExcerpt.excerpt}</pre>
+        </div>
+      )}
+
+      {docExcerptStatus === 'error' && docExcerptError && (
+        <div style={{ marginBottom: 12, color: '#b91c1c', fontSize: 12 }}>Error: {docExcerptError}</div>
+      )}
 
       {/* 上部ツールバー */}
       <div className="toolbar" style={{ marginBottom: 12, justifyContent:'space-between' }}>
