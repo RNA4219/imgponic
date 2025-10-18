@@ -23,9 +23,6 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: |
-            **/package-lock.json
-            **/npm-shrinkwrap.json
       - name: ESLint (if exists)
         run: |
           set -Eeuo pipefail
@@ -56,9 +53,6 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: |
-            **/package-lock.json
-            **/npm-shrinkwrap.json
       - name: TypeScript (if exists)
         run: |
           set -Eeuo pipefail
@@ -89,9 +83,6 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: |
-            **/package-lock.json
-            **/npm-shrinkwrap.json
       - name: Node unit (repo root)
         if: ${{ hashFiles('package.json') != '' }}
         run: |
@@ -180,9 +171,6 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: |
-            **/package-lock.json
-            **/npm-shrinkwrap.json
       - name: Build (if exists)
         run: |
           set -Eeuo pipefail
