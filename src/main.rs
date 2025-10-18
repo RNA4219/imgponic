@@ -633,8 +633,11 @@ fn write_workspace(app: tauri::AppHandle, ws: Workspace) -> Result<String, Strin
     }
 }
 
-fn main() {
-    tauri::Builder::default()
+pub fn configure_builder<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    builder
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(StreamState::default())
         .invoke_handler(tauri::generate_handler![
             compose_prompt,
@@ -652,6 +655,10 @@ fn main() {
             read_workspace,
             write_workspace
         ])
+}
+
+fn main() {
+    configure_builder(tauri::Builder::default())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
