@@ -6,7 +6,7 @@ last_reviewed_at: 2024-10-01
 next_review_due: 2025-04-01
 ---
 
-<!-- markdownlint-disable-next-line MD022 -->
+<!-- markdownlint-disable-next-line MD022 MD041 -->
 # Imgponic — 想像を育てるプロンプト温室
 **Version:** 1.0.0
 **License:** MIT  
@@ -16,6 +16,7 @@ Imgponic は、**プロンプトとコードを“育てる”ためのローカ
 左右2ペインで編集→整形→反映のループを高速に回せます。Ollamaと連携し、**完全ローカル・Docker不要**。
 
 <!-- LLM-BOOTSTRAP v1 -->
+
 読む順番:
 
 1. [docs/birdseye/index.json](docs/birdseye/index.json) …… ノード一覧と隣接関係の軽量マップ。
