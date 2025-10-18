@@ -204,25 +204,71 @@ export default function App() {
   const [leftSelection, setLeftSelection] = useState<string>('')
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
+  const responseBufferRef = useRef<string>('')
   const updateLeftText = useCallback((value: string) => {
     setLeftText(value)
     setHasDangerWords(containsDangerWords(value))
   }, [])
 
-  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
-    onChunk: chunk => setRightText(prev => prev + chunk),
-    onEnd: () => setRunning(false),
-    onError: message => {
+  const clearStreamedResponse = useCallback(
+    (options?: { preserveRightText?: boolean }) => {
+      responseBufferRef.current = ''
+      if (!options?.preserveRightText) {
+        setRightText('')
+      }
+    },
+    [setRightText]
+  )
+
+  const appendStreamChunk = useCallback(
+    (chunk: string) => {
+      responseBufferRef.current += chunk
+      setRightText(responseBufferRef.current)
+    },
+    [setRightText]
+  )
+
+  const handleStreamEnd = useCallback(() => {
+    setRunning(false)
+    const responseText = responseBufferRef.current
+    const latestComposed = composedRef.current
+    void (async () => {
+      if (latestComposed) {
+        try {
+          await invokeFn('save_run', {
+            recipePath,
+            final_prompt: latestComposed.final_prompt,
+            response_text: responseText
+          })
+        } catch (error) {
+          console.error('save_run failed', error)
+        }
+      }
+      clearStreamedResponse({ preserveRightText: true })
+    })()
+  }, [clearStreamedResponse, invokeFn, recipePath])
+
+  const handleStreamError = useCallback(
+    (message: string) => {
       console.error('ollama stream error', message)
       setRunning(false)
+      setOllamaError(describeOllamaError(message))
       clearStreamedResponse()
-    }
+    },
+    [clearStreamedResponse, setOllamaError]
+  )
+
+  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
+    onChunk: appendStreamChunk,
+    onEnd: handleStreamEnd,
+    onError: handleStreamError
   })
   const abortStream = useCallback(async () => {
     resetOllamaError()
     setRunning(false)
     await rawAbortStream()
-  }, [resetOllamaError, rawAbortStream])
+    clearStreamedResponse()
+  }, [clearStreamedResponse, resetOllamaError, rawAbortStream])
 
   useEffect(() => {
     const storedContrast = localStorage.getItem(ACCESSIBILITY_STORAGE_KEYS.highContrast)
@@ -374,7 +420,6 @@ export default function App() {
     if (isStreaming) return
     resetOllamaError()
     setRunning(true)
-    setRightText('')
     clearStreamedResponse()
     try {
       const c = composed ?? await doCompose()

@@ -748,19 +748,29 @@ domTest('clears accumulated stream text after aborts and errors', async () => {
   await act(async () => { await streamApi?.abortStream() })
   await act(async () => { await Promise.resolve() })
   assert.deepEqual(savedTexts, ['first'])
+  await flushEffects()
+
+  const rightTextarea = container.querySelector('textarea[data-side="right"]')
+  assert.ok(rightTextarea instanceof HTMLTextAreaElement)
+  assert.equal(rightTextarea.value, '')
 
   await act(async () => { runButton.click() })
   await act(async () => { await Promise.resolve() })
   assert.deepEqual(savedTexts, ['first'])
+  await flushEffects()
+
+  const afterErrorTextarea = container.querySelector('textarea[data-side="right"]')
+  assert.ok(afterErrorTextarea instanceof HTMLTextAreaElement)
+  assert.equal(afterErrorTextarea.value, '')
 
   await act(async () => { runButton.click() })
   await act(async () => { await Promise.resolve() })
   await act(async () => { await Promise.resolve() })
   assert.deepEqual(savedTexts, ['first', 'third'])
 
-  const rightTextarea = container.querySelector('textarea[data-side="right"]')
-  assert.ok(rightTextarea instanceof HTMLTextAreaElement)
-  assert.equal(rightTextarea.value, 'third')
+  const finalTextarea = container.querySelector('textarea[data-side="right"]')
+  assert.ok(finalTextarea instanceof HTMLTextAreaElement)
+  assert.equal(finalTextarea.value, 'third')
 
   await act(async () => { root.unmount() })
   container.remove()
