@@ -14,7 +14,6 @@ type StreamState = { startStream: (args: StreamArgs) => Promise<void>; abortStre
 export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
   const [isStreaming, setIsStreaming] = useState(false)
   const handlerRef = useRef(handlers)
-  const abortRef = useRef<AbortController | null>(null)
   const unlistenRef = useRef<UnlistenFn[] | null>(null)
   const streamingRef = useRef(false)
 
@@ -32,7 +31,6 @@ export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
   const finalize = useCallback((kind: 'end' | 'error', reason?: unknown) => {
     if (!streamingRef.current) return
     streamingRef.current = false
-    abortRef.current = null
     setIsStreaming(false)
     void clearListeners()
     if (kind === 'end') handlerRef.current.onEnd?.()
@@ -43,7 +41,6 @@ export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
     if (streamingRef.current) return
     streamingRef.current = true
     setIsStreaming(true)
-    abortRef.current = new AbortController()
     const unlisteners: UnlistenFn[] = []
     const register = async (name: string, cb: (event: unknown) => void) => unlisteners.push(await appWindow.listen(name, cb as (event: unknown) => void))
     await register('ollama:chunk', (event: { payload: string }) => appendChunk(event.payload))
@@ -52,7 +49,6 @@ export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
     unlistenRef.current = unlisteners
     try {
       await invoke('run_ollama_stream', args)
-      finalize('end')
     } catch (error) {
       finalize('error', error)
       throw error
@@ -61,8 +57,6 @@ export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
 
   const abortStream = useCallback(async () => {
     if (!streamingRef.current) return
-    abortRef.current?.abort()
-    abortRef.current = null
     try {
       await invoke('abort_current_stream')
     } finally {
@@ -86,6 +80,7 @@ if (import.meta.vitest) {
     let listeners: Record<string, (event: HandlerPayload) => void>
     let resolveRun: (() => void) | null
     let rejectRun: ((error: unknown) => void) | null
+    let runOverride: (() => Promise<void>) | null
 
     const mount = (handlers?: StreamHandlers) => {
       const root = createRoot(document.createElement('div'))
@@ -103,12 +98,16 @@ if (import.meta.vitest) {
       listeners = {}
       resolveRun = null
       rejectRun = null
+      runOverride = null
       vi.spyOn(appWindow, 'listen').mockImplementation(async (event: string, handler: (payload: HandlerPayload) => void) => {
         listeners[event] = handler
         return () => { delete listeners[event] }
       })
       vi.spyOn(tauriModule, 'invoke').mockImplementation(async (cmd: string) => {
-        if (cmd === 'run_ollama_stream') return await new Promise<void>((resolve, reject) => { resolveRun = resolve; rejectRun = reject })
+        if (cmd === 'run_ollama_stream') {
+          if (runOverride) return await runOverride()
+          return await new Promise<void>((resolve, reject) => { resolveRun = resolve; rejectRun = reject })
+        }
         if (cmd === 'abort_current_stream') resolveRun?.()
         return undefined
       })
@@ -136,6 +135,19 @@ if (import.meta.vitest) {
       listeners['ollama:error']?.({ payload: new Error('boom') })
       await act(async () => { rejectRun?.(new Error('boom')); await startPromise.catch(() => {}) })
       expect(errors[0]).toBe('boom'); expect(result.current?.isStreaming).toBe(false)
+      unmount()
+    })
+
+    it('keeps subscription when run resolves synchronously', async () => {
+      const chunks: string[] = []
+      runOverride = async () => {}
+      const { result, unmount } = mount({ onChunk: chunk => chunks.push(chunk) })
+      const startPromise = result.current?.startStream({ model: 'm', systemText: 's', userText: 'u' }) ?? Promise.resolve()
+      await act(async () => { await Promise.resolve() })
+      expect(result.current?.isStreaming).toBe(true)
+      listeners['ollama:chunk']?.({ payload: 'late' })
+      expect(chunks).toEqual(['late'])
+      await act(async () => { listeners['ollama:end']?.({}); await startPromise })
       unmount()
     })
   })
