@@ -46,6 +46,7 @@ jobs:
         with:
           name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
+          overwrite: true
 
   format:
     runs-on: ubuntu-24.04
@@ -75,6 +76,7 @@ jobs:
         with:
           name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
+          overwrite: true
 
   typecheck:
     runs-on: ubuntu-24.04
@@ -104,6 +106,7 @@ jobs:
         with:
           name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
+          overwrite: true
 
   unit:
     runs-on: ubuntu-24.04
@@ -189,6 +192,7 @@ jobs:
         with:
           name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
+          overwrite: true
 
   security:
     runs-on: ubuntu-24.04
@@ -214,6 +218,7 @@ jobs:
         with:
           name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
+          overwrite: true
 
   coverage:
     runs-on: ubuntu-24.04
@@ -243,6 +248,7 @@ jobs:
         with:
           name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
+          overwrite: true
 
   build:
     needs: [lint, typecheck, unit]
@@ -281,6 +287,7 @@ jobs:
         with:
           name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
+          overwrite: true
 
   e2e:
     needs: [build]
@@ -312,6 +319,7 @@ jobs:
         with:
           name: test-logs-${{ github.job }}
           path: workflow-cookbook/logs/*
+          overwrite: true
 
   report:
     needs: [lint, format, typecheck, unit, security, coverage, build, e2e]
