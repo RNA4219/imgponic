@@ -114,35 +114,33 @@ describe('useSetupCheck', () => {
     await hook.unmount()
   })
 
-  it('normalizes snake_case statuses returned by tauri backend', async () => {
-    vi.mocked(invoke).mockResolvedValueOnce({ status: 'ready' })
+  it('normalizes backend statuses including snake_case aliases', async () => {
+    const expectations = [
+      { backend: { status: 'ready' as const }, expected: { status: 'ok', guidance: '' } },
+      {
+        backend: { status: 'server_unavailable' as const },
+        expected: { status: 'offline', guidanceMatcher: expect.stringContaining('Ollama') }
+      },
+      {
+        backend: { status: 'model_missing' as const, guidance: 'install from backend' },
+        expected: { status: 'missing-model', guidance: 'install from backend' }
+      }
+    ]
 
-    const readyHook = await renderHook('phi')
-    await flushEffects()
+    for (const { backend, expected } of expectations) {
+      vi.mocked(invoke).mockResolvedValueOnce(backend)
 
-    expect(readyHook.result.current.status).toBe('ok')
-    expect(readyHook.result.current.guidance).toBe('')
+      const hook = await renderHook('phi')
+      await flushEffects()
 
-    await readyHook.unmount()
+      expect(hook.result.current.status).toBe(expected.status)
+      if ('guidanceMatcher' in expected) {
+        expect(hook.result.current.guidance).toEqual(expected.guidanceMatcher)
+      } else {
+        expect(hook.result.current.guidance).toBe(expected.guidance)
+      }
 
-    vi.mocked(invoke).mockResolvedValueOnce({ status: 'server_unavailable' })
-
-    const offlineHook = await renderHook('phi')
-    await flushEffects()
-
-    expect(offlineHook.result.current.status).toBe('offline')
-    expect(offlineHook.result.current.guidance).toContain('Ollama')
-
-    await offlineHook.unmount()
-
-    vi.mocked(invoke).mockResolvedValueOnce({ status: 'model_missing', guidance: 'install from backend' })
-
-    const missingHook = await renderHook('phi')
-    await flushEffects()
-
-    expect(missingHook.result.current.status).toBe('missing-model')
-    expect(missingHook.result.current.guidance).toBe('install from backend')
-
-    await missingHook.unmount()
+      await hook.unmount()
+    }
   })
 })

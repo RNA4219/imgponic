@@ -7,7 +7,7 @@ export type SetupStatus = 'ok' | 'offline' | 'missing-model'
 type BackendSetupStatus = SetupStatus | 'ready' | 'server_unavailable' | 'model_missing'
 
 type SetupCheckResponse = {
-  status: BackendSetupStatus
+  status: BackendSetupStatus | string
   guidance?: string
 }
 
@@ -22,24 +22,34 @@ const DEFAULT_GUIDANCE: Record<SetupStatus, string> = {
   offline: 'Ollama service is not reachable. Please start Ollama and retry.'
 }
 
-const isBackendSetupStatus = (value: unknown): value is BackendSetupStatus =>
-  value === 'ok' ||
-  value === 'offline' ||
-  value === 'missing-model' ||
-  value === 'ready' ||
-  value === 'server_unavailable' ||
-  value === 'model_missing'
+const normalizeStatus = (status: unknown): SetupStatus | undefined => {
+  if (typeof status !== 'string') {
+    return undefined
+  }
 
-const normalizeStatus = (status: BackendSetupStatus): SetupStatus => {
-  switch (status) {
+  const trimmed = status.trim()
+  if (!trimmed) {
+    return undefined
+  }
+
+  const snakeCase = trimmed
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[-\s]+/g, '_')
+    .toLowerCase()
+
+  switch (snakeCase) {
+    case 'ok':
     case 'ready':
       return 'ok'
+    case 'offline':
     case 'server_unavailable':
       return 'offline'
+    case 'missing-model':
+    case 'missing_model':
     case 'model_missing':
       return 'missing-model'
     default:
-      return status
+      return undefined
   }
 }
 
@@ -47,13 +57,14 @@ const normalizeResponse = (response: unknown): SetupState => {
   if (
     response &&
     typeof response === 'object' &&
-    'status' in response &&
-    isBackendSetupStatus((response as { status: unknown }).status)
+    'status' in response
   ) {
     const typed = response as SetupCheckResponse
     const status = normalizeStatus(typed.status)
-    const guidance = typed.guidance ?? DEFAULT_GUIDANCE[status]
-    return { status, guidance }
+    if (status) {
+      const guidance = typed.guidance ?? DEFAULT_GUIDANCE[status]
+      return { status, guidance }
+    }
   }
 
   return { status: 'offline', guidance: DEFAULT_GUIDANCE.offline }
