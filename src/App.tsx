@@ -194,6 +194,10 @@ export default function App() {
   // パラメータ
   const [params, setParams] = useState({ goal: '30秒の戦闘シーン', tone: '冷静', steps: 6, user_input: '' })
   const [composed, setComposed] = useState<ComposeResult | null>(null)
+  const composedRef = useRef<ComposeResult | null>(composed)
+  useEffect(() => {
+    composedRef.current = composed
+  }, [composed])
   const [diffPatch, setDiffPatch] = useState<string | null>(null)
   const [showKeybindOverlay, setShowKeybindOverlay] = useState(false)
 
@@ -207,13 +211,38 @@ export default function App() {
   const [leftSelection, setLeftSelection] = useState<string>('')
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
-  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
-    onChunk: chunk => setRightText(prev => prev + chunk),
-    onEnd: () => setRunning(false),
-    onError: message => {
-      console.error('ollama stream error', message)
+  const [streamedResponse, setStreamedResponse] = useState<string>('')
+  const streamedResponseRef = useRef(streamedResponse)
+  useEffect(() => {
+    streamedResponseRef.current = streamedResponse
+  }, [streamedResponse])
+  const clearStreamedResponse = useCallback(() => {
+    setStreamedResponse('')
+  }, [])
+  const { startStream, abortStream, isStreaming } = useOllamaStream({
+    onChunk: chunk => {
+      setRightText(prev => prev + chunk)
+      setStreamedResponse(prev => prev + chunk)
+    },
+    onEnd: async () => {
       setRunning(false)
-      setOllamaError(describeOllamaError(message))
+      const finalPrompt = composedRef.current?.final_prompt
+      if (finalPrompt) {
+        try {
+          await invokeFn('save_run', {
+            recipePath,
+            final_prompt: finalPrompt,
+            response_text: streamedResponseRef.current
+          })
+        } catch (error) {
+          console.warn('save_run failed', error)
+        }
+      }
+      clearStreamedResponse()
+    },
+    onError: () => {
+      setRunning(false)
+      clearStreamedResponse()
     }
   })
   const abortStream = useCallback(async () => {
@@ -372,6 +401,7 @@ export default function App() {
     resetOllamaError()
     setRunning(true)
     setRightText('')
+    clearStreamedResponse()
     try {
       const c = composed ?? await doCompose()
       const sep = '\n---\nUSER_INPUT'
@@ -389,7 +419,7 @@ export default function App() {
       setRunning(false)
       setOllamaError(describeOllamaError(error))
     }
-  }, [isStreaming, resetOllamaError, composed, doCompose, startStream, ollamaModel])
+  }, [isStreaming, composed, doCompose, startStream, ollamaModel, clearStreamedResponse])
 
   // 右→左 反映（プレビュー付き）
   const diffFlow = useMemo(() => createDiffPreviewFlow({ readLeft: () => leftText, readRight: () => rightText, show: value => setDiffPatch(value), apply: value => setLeftText(value), close: () => setDiffPatch(null) }), [leftText, rightText])
