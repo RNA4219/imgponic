@@ -46,6 +46,8 @@ pub fn load_txt_excerpt(path: &str, max_bytes: Option<u64>) -> Result<TxtExcerpt
     let truncated = size_bytes > limit_bytes as u64;
     let used_bytes = size_bytes.min(limit_bytes as u64);
 
+    const TRUNCATION_MARKER: &str = "...[TRUNCATED]...";
+
     let excerpt = if !truncated {
         content.clone()
     } else if limit_bytes == 0 {
@@ -57,11 +59,16 @@ pub fn load_txt_excerpt(path: &str, max_bytes: Option<u64>) -> Result<TxtExcerpt
         let head = slice_prefix(&content, head_len);
         let tail = slice_suffix(&content, tail_len);
 
-        if head.is_empty() || tail.is_empty() {
-            format!("{}{}", head, tail)
-        } else {
-            format!("{}\n...\n{}", head, tail)
+        let mut parts: Vec<&str> = Vec::new();
+        if !head.is_empty() {
+            parts.push(head);
         }
+        parts.push(TRUNCATION_MARKER);
+        if !tail.is_empty() {
+            parts.push(tail);
+        }
+
+        parts.join("\n\n")
     };
 
     Ok(TxtExcerpt {

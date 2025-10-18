@@ -87,7 +87,9 @@ fn load_txt_excerpt_applies_head_tail_with_limit() {
 
     let expected_head = &content[..15];
     let expected_tail = &content[content.len() - 5..];
-    let expected_excerpt = format!("{}\n...\n{}", expected_head, expected_tail);
+    assert!(result.excerpt.contains("...[TRUNCATED]..."));
+    let expected_excerpt =
+        format!("{}\n\n...[TRUNCATED]...\n\n{}", expected_head, expected_tail);
     assert_eq!(result.excerpt, expected_excerpt);
 
     let mut hasher = Sha256::new();
