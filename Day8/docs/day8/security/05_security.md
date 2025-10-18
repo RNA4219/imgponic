@@ -3,7 +3,7 @@
 ## ポリシー（例）
 
 ```yaml
-# governance/policy.yaml（例）
+  # governance/policy.yaml（例）
 owners: ["@RNA4219"]
 slo:
   max_duration_p95_ms: 2000

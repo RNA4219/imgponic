@@ -11,7 +11,7 @@
 ## 反省DSL（例）
 
 ```yaml
-# workflow-cookbook/reflection.yaml
+  # workflow-cookbook/reflection.yaml
 targets:
   - name: unit
     logs: ["logs/test.jsonl"]
