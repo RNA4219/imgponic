@@ -51,7 +51,7 @@ jobs:
           run_check rust::clippy cargo clippy --all-targets --all-features -D warnings
           run_check rust::test cargo test --all-features --workspace
           run_check rust::build cargo build --release --workspace
-          run_check rust::doc cargo doc --no-deps -D warnings --workspace
+          run_check rust::doc env RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
           if ! cargo install cargo-audit >/dev/null 2>&1; then true; fi
           start=$(date +%s%3N)
           if cargo audit -q; then
