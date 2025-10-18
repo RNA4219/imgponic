@@ -1,6 +1,7 @@
 # 仕様（Specification）
 
 ## ディレクトリ標準
+
 - `.github/workflows/` : `test.yml`, `reflection.yml`（必要に応じ `pr_gate.yml`）
 - `workflow-cookbook/`
   - `workflow-cookbook/reflection.yaml` （反省DSL）
@@ -8,6 +9,7 @@
   - `logs/` / `reports/` / `docs/`
 
 ## 反省DSL（例）
+
 ```yaml
 # workflow-cookbook/reflection.yaml
 targets:
@@ -28,6 +30,7 @@ report:
 ```
 
 ## GitHub Actions（要点）
+
 - `test.yml`: ログ生成→アーティファクト化
 - `reflection.yml`: `workflow_run` で `test` 連動。ログを解析してレポートコミット、必要なら Issue 草案起票。
 - サブディレクトリ対応: `defaults.run.working-directory: workflow-cookbook`

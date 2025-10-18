@@ -6,6 +6,8 @@ last_reviewed_at: 2024-10-01
 next_review_due: 2025-04-01
 ---
 
+
+<!-- markdownlint-disable-next-line MD022 -->
 # Imgponic — 想像を育てるプロンプト温室
 **Version:** 1.0.0  
 **License:** MIT  
@@ -17,9 +19,11 @@ Imgponic は、**プロンプトとコードを“育てる”ためのローカ
 ---
 
 ## 🕔 5分で開始（Windows）
+
 > 前提: Windows 10/11、**Node.js LTS**, **Rust (stable)**, **Ollama** がインストール済み
 
 ### 1) Ollamaを起動（モデル準備）
+
 ```powershell
 # 例：Llama 3 8B
 ollama pull llama3:8b
@@ -27,13 +31,15 @@ ollama pull llama3:8b
 ```
 
 ### 2) リリースを取得
-- **NSISインストーラ** または **Portable ZIP** をダウンロード（Releases から）  
+
+- **NSISインストーラ** または **Portable ZIP** をダウンロード（Releases から）
 - インストール or 展開して `imgponic` を起動
 
 ### 3) 初回ランディング
-1. 画面上部の **Model** に `llama3:8b` を入力  
-2. **Recipe** に `data/recipes/demo.sora2.yaml` を指定（同梱例）  
-3. 左にテキストを貼り、**▶ 実行** → 右に整形出力  
+
+1. 画面上部の **Model** に `llama3:8b` を入力
+2. **Recipe** に `data/recipes/demo.sora2.yaml` を指定（同梱例）
+3. 左にテキストを貼り、**▶ 実行** → 右に整形出力
 4. **⇧ 反映**で左に戻し、**保存**で `project/` に書き出し
 
 > *Ollama未起動の場合、起動案内が表示されます。*
@@ -41,24 +47,27 @@ ollama pull llama3:8b
 ---
 
 ## ✨ 主な機能
-- **レシピ合成**：テンプレ片（フラグメント）を順に連結し、`{key}` を展開  
-- **Ollama実行**：System/Userを分離して `/api/chat` へ投げる（stream=false）  
-- **サンドボックスI/O**：`project/` で .py/.txt/.md/.json を安全に開く・保存  
-- **ワークスペース復元**：前回の編集状態を自動復元（約800msデバウンス保存）  
-- **ログ**：`runs/<ts>/` に合成プロンプト・レスポンスを保存  
+
+- **レシピ合成**：テンプレ片（フラグメント）を順に連結し、`{key}` を展開
+- **Ollama実行**：System/Userを分離して `/api/chat` へ投げる（stream=false）
+- **サンドボックスI/O**：`project/` で .py/.txt/.md/.json を安全に開く・保存
+- **ワークスペース復元**：前回の編集状態を自動復元（約800msデバウンス保存）
+- **ログ**：`runs/<ts>/` に合成プロンプト・レスポンスを保存
 - **配色**：やさしいミント×アイボリー（温室の光）
 
 ---
 
 ## ⌨️ ショートカット
-- **Ctrl/Cmd+Enter**：実行（▶）  
-- **Ctrl/Cmd+S**：左ペインを `project/` に保存  
+
+- **Ctrl/Cmd+Enter**：実行（▶）
+- **Ctrl/Cmd+S**：左ペインを `project/` に保存
 - **Ctrl/Cmd+C**：右ペインのコピー（フォーカス優先）
 
 ---
 
 ## Repository structure
-```
+
+```text
 README.md       # 本ドキュメント
 data/           # レシピ/フラグメント
 project/        # 編集対象（サンドボックス）
@@ -73,7 +82,8 @@ docs/           # 仕様/設計/配色ほか
 ---
 
 ## 📁 ディレクトリ
-```
+
+```text
 data/           # レシピ/フラグメント
 project/        # 編集対象（サンドボックス）
 corpus/         # TXTの簡易RAG（将来強化）
@@ -87,31 +97,36 @@ docs/           # 仕様/設計/配色ほか
 ---
 
 ## 🔒 セキュリティ
-- 外部送信なし（完全ローカル）  
-- `ensure_under` による **サンドボックス**（`project/` などの外は拒否）  
+
+- 外部送信なし（完全ローカル）
+- `ensure_under` による **サンドボックス**（`project/` などの外は拒否）
 - Tauri allowlistで **Ollama以外のHTTP** を禁止
 
 ---
 
 ## 🧩 設定／テーマ
-- 色トークンは `src/app.css` の `:root` で定義  
+
+- 色トークンは `src/app.css` の `:root` で定義
 - 配色仕様の詳細 → `docs/Imgponic_配色仕様_v1.0.md`
 
 ---
 
 ## 🆘 トラブルシュート
-- **Ollama unreachable**: モデルが未pull/未起動。`ollama pull llama3:8b` を確認。  
-- **path out of sandbox**: `project/` や `prompts/` 等の**内側**で操作してください。  
-- **文字化け**: UTF-8（BOM推奨しない）で保存してください。  
+
+- **Ollama unreachable**: モデルが未pull/未起動。`ollama pull llama3:8b` を確認。
+- **path out of sandbox**: `project/` や `prompts/` 等の**内側**で操作してください。
+- **文字化け**: UTF-8（BOM推奨しない）で保存してください。
 - **長文が重い**: 選択範囲だけ送る機能は v0.4 で追加予定。
 
 ---
 
 ## 🗺️ ロードマップ（抜粋）
-- **v1.0**（本リリース）: 2ペイン/合成/Ollama/Project I-O/Workspace/ログ/テーマ  
+
+- **v1.0**（本リリース）: 2ペイン/合成/Ollama/Project I-O/Workspace/ログ/テーマ
 - **v0.4系**（計画）: ストリーミング、選択送信、タブ永続化、差分プレビュー、CI/Docs整備
 
 ---
 
 ## 📜 ライセンス
+
 [MIT](LICENSE) © 2025 Imgponic contributors
