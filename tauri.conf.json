@@ -1,37 +1,49 @@
 {
-  "package": {
-    "productName": "PromptForge",
-    "version": "0.3.0"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": true,
-      "fs": {
-        "all": true
-      },
-      "path": {
-        "all": true
-      },
-      "shell": {
-        "all": false
-      },
-      "http": {
-        "request": true,
-        "scope": [
-          "http://localhost:11434/*"
-        ]
-      }
-    },
-    "windows": [
-      {
-        "title": "PromptForge",
-        "width": 1150,
-        "height": 820
-      }
-    ]
-  },
+  "$schema": "./node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "PromptForge",
+  "version": "0.3.0",
+  "identifier": "com.promptforge.app",
   "build": {
+    "frontendDist": "dist",
+    "devUrl": "http://localhost:5173",
     "beforeDevCommand": "vite",
     "beforeBuildCommand": "vite build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "PromptForge",
+        "width": 1150,
+        "height": 820,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "default",
+          "windows": ["*"],
+          "permissions": [
+            "core:default",
+            "path:default",
+            "fs:default",
+            "dialog:default",
+            "clipboard-manager:default",
+            {
+              "identifier": "http:allow-request",
+              "allow": [
+                { "url": "http://localhost:11434/**" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "active": false
   }
 }
