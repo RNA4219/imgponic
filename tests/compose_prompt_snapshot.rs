@@ -1,9 +1,17 @@
+use std::env;
 use std::fs;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use promptforge::tests::_compose_prompt;
 
+fn env_lock() -> MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
+}
+
 #[test]
 fn compose_prompt_snapshot() {
+    let _guard = env_lock();
     let temp = tempfile::tempdir().expect("failed to create temp dir");
     let base = temp.path();
 
@@ -36,9 +44,13 @@ content: |
     )
     .expect("failed to write fragment");
 
+    env::set_var("PROMPTFORGE_DATA_DIR", base.to_str().unwrap());
+
     let recipe_path = recipes_dir.join("demo.yaml");
 
     let result = _compose_prompt(recipe_path.to_str().unwrap(), None).expect("compose prompt");
 
     insta::assert_snapshot!(result.final_prompt);
+
+    env::remove_var("PROMPTFORGE_DATA_DIR");
 }

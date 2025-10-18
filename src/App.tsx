@@ -7,6 +7,7 @@ import './app.css'
 import { containsDangerWords } from './security/dangerWords'
 import { useOllamaStream } from './useOllamaStream'
 import KeybindOverlay, { resolveKeybindOverlayState } from './KeybindOverlay'
+import { containsDangerWord } from './security/dangerWords'
 
 export type ComposeResult = { final_prompt: string; sha256: string; model: string }
 type InvokeFunction = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
@@ -163,6 +164,7 @@ export default function App() {
   const [leftSelection, setLeftSelection] = useState<string>('')
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
+  const leftHasDangerWord = useMemo(() => containsDangerWord(leftText), [leftText])
 
   const { startStream, abortStream, isStreaming } = useOllamaStream({
     onChunk: chunk => setRightText(prev => prev + chunk),
@@ -545,6 +547,11 @@ export default function App() {
             <span>選択のみ送る</span>
             <span className="badge">{formatSelectionSummary(sendSelectionOnly, leftSelection, selectionPreview)}</span>
           </label>
+          {leftHasDangerWord && (
+            <span className="badge" data-testid="danger-word-warning" title="危険語が含まれています">
+              ⚠️ 危険語検出
+            </span>
+          )}
           <details style={{ maxWidth: 280 }}>
             <summary>送信範囲プレビュー</summary>
             <pre style={{ marginTop: 8, maxHeight: 180, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{selectionPreview || '(なし)'}</pre>

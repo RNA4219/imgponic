@@ -92,3 +92,85 @@ fn load_txt_excerpt_rejects_out_of_sandbox() {
     assert_eq!(err, "path out of sandbox");
     drop(base);
 }
+
+mod compose_prompt_sandbox {
+    use super::*;
+    use serde_json::json;
+    use std::env;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::{Mutex, OnceLock};
+    use tempfile::tempdir;
+
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
+    }
+
+    fn write_recipe(base: &PathBuf) {
+        fs::create_dir_all(base.join("recipes")).expect("create recipes dir");
+        fs::write(
+            base.join("recipes/demo.yaml"),
+            r"profile: llama3
+fragments:
+  - system.prompt
+params:
+  user_input: Hello
+",
+        )
+        .expect("write recipe");
+    }
+
+    fn write_fragment(base: &PathBuf) {
+        fs::create_dir_all(base.join("fragments/system")).expect("create fragments dir");
+        fs::write(
+            base.join("fragments/system/prompt.yaml"),
+            r"id: system.prompt
+kind: system
+content: |
+  Hi {{user_input}}
+",
+        )
+        .expect("write fragment");
+    }
+
+    #[test]
+    fn compose_prompt_rejects_parent_escape() {
+        let _guard = env_lock();
+        let temp = tempdir().expect("create tempdir");
+        let base = temp.path().join("data_root");
+        fs::create_dir_all(base.join("fragments")).expect("create fragments root");
+        fs::create_dir_all(temp.path().join("outside/recipes")).expect("create outside recipes");
+        fs::write(
+            temp.path().join("outside/recipes/evil.yaml"),
+            "profile: llama3\nfragments: []\n",
+        )
+        .expect("write outside recipe");
+
+        env::set_var("PROMPTFORGE_DATA_DIR", base.to_str().unwrap());
+
+        let err = _compose_prompt("../outside/recipes/evil.yaml", None)
+            .expect_err("expected sandbox error");
+        assert_eq!(err.to_string(), "path out of sandbox");
+
+        env::remove_var("PROMPTFORGE_DATA_DIR");
+    }
+
+    #[test]
+    fn compose_prompt_accepts_in_sandbox_paths() {
+        let _guard = env_lock();
+        let temp = tempdir().expect("create tempdir");
+        let base = temp.path().join("data_root");
+        write_recipe(&base);
+        write_fragment(&base);
+
+        env::set_var("PROMPTFORGE_DATA_DIR", base.to_str().unwrap());
+
+        let result = _compose_prompt("recipes/demo.yaml", Some(json!({ "user_input": "World" })))
+            .expect("compose prompt succeeds");
+        assert!(result.final_prompt.contains("World"));
+        assert_eq!(result.model, "llama3");
+
+        env::remove_var("PROMPTFORGE_DATA_DIR");
+    }
+}
