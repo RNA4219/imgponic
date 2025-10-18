@@ -42,8 +42,8 @@
 
 | Token | 既定値 | 用途 |
 |---|---|---|
-| `--text-letter-spacing` | `0.1px` | ベース本文の字間調整（16px基準で約+0.006em）。可読性と行末揃えを両立するデフォルト値。 |
-| `--text-line-height` | `1.5` | ベース本文の行間（WCAG 2.1 AA を満たす既定ライン）。モーダルやフォームにも共通適用。 |
+| `--text-letter-spacing` | `0.1px` | ベース本文の字間調整（16px基準で+0.006em前後）。可読性と行末揃えを両立。 |
+| `--text-line-height` | `1.5` | ベース本文の行間。WCAG 2.1 AA を満たし、モーダルやフォームにも共通適用。 |
 
 ## 2. タイポグラフィ（推奨）
 
@@ -74,8 +74,10 @@
 ### 4.1 高コントラストモード指針
 
 - 推奨配色: 背景 `#0B0B0B`、本文 `#FFFFFF`、強調 `#FFD447`、リンク `#7CD57C`（コントラスト比 7:1 以上）
-- 適用クラス: `body.high-contrast` をルートに付与し、配下コンポーネントは `body.high-contrast .btn` など状態別セレクタで上書きする
-- アクセシビリティ整合: 高コントラスト時も `--text-letter-spacing` と `--text-line-height` を共有し、視認性基準（WCAG 2.1 AA）を保持する
+- 適用クラス: `body.high-contrast` をルートに付与し、配下コンポーネントは
+  `body.high-contrast .btn` など状態別セレクタで上書きする
+- アクセシビリティ整合: 高コントラスト時も `--text-letter-spacing` と
+  `--text-line-height` を共有し、視認性基準（WCAG 2.1 AA）を保持する
 - 配色変更はフォーカスインジケータを `outline: 3px solid #FFD447` 程度に強調し、キーボード操作での判別を担保する
 
 ## 5. 実装トークン（CSS変数例）
@@ -123,9 +125,17 @@ body.high-contrast .btn {
 
 ## 6. ハイコントラスト切替とタイポグラフィプリセット
 
-- **ハイコントラスト切替**: アプリは `accessibility:highContrast` キーで状態を保持し、`body.high-contrast` クラスの付け外しで `--bg`・`--ink` などの変数を切り替える。ボタンなどのアクセント系は `body.high-contrast .btn` を基点に再配色する。
-- **タイポグラフィプリセット**: ローカルストレージ `accessibility:typography` に `normal` / `relaxed` / `spacious` を保存し、`body.typography-normal` などのクラスを付与して `--text-letter-spacing`・`--text-line-height` を上書きする想定。既定値は `:root` の `0.1px` / `1.5` を継承し、ゆったり系プリセットでは `--text-line-height` を段階的に 1.6 / 1.7 付近に引き上げる。
-- **適用順序**: ハイコントラストとタイポグラフィクラスは併存可能で、双方が `letter-spacing` と `line-height` を同じ CSS カスタムプロパティで共有するため、重複定義は避けて `var(--text-letter-spacing)` / `var(--text-line-height)` を参照する。
+- **ハイコントラスト切替**: アプリは `accessibility:highContrast` キーで状態を保持し、
+  `body.high-contrast` クラスの付け外しで `--bg`・`--ink` などの変数を切り替える。
+  ボタンなどのアクセント系は `body.high-contrast .btn` を基点に再配色する。
+- **タイポグラフィプリセット**: ローカルストレージ `accessibility:typography` に
+  `normal` / `relaxed` / `spacious` を保存し、`body.typography-normal` などのクラスを
+  付与して `--text-letter-spacing`・`--text-line-height` を上書きする。既定値は
+  `:root` の `0.1px` / `1.5` を継承し、ゆったり系プリセットでは
+  `--text-line-height` を段階的に 1.6 / 1.7 付近に引き上げる。
+- **適用順序**: ハイコントラストとタイポグラフィクラスは併存可能で、双方が
+  `letter-spacing` と `line-height` を同じ CSS カスタムプロパティで共有するため、
+  重複定義は避けて `var(--text-letter-spacing)` / `var(--text-line-height)` を参照する。
 
 ## 7. ダークモード（将来）
 
