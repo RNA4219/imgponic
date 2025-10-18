@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use futures_util::future::{AbortHandle, Abortable};
+use futures_util::future::AbortHandle;
 use serde::Deserialize;
 use tokio::sync::Mutex;
 #[derive(Clone, Default)]
@@ -65,6 +65,7 @@ pub fn parse_ollama_jsonl_chunk(line: &str) -> Result<Vec<OllamaEvent>, serde_js
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::future::Abortable;
     use futures_util::future::Aborted;
     use std::time::Duration;
 
