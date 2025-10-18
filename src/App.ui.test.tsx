@@ -1,7 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { renderToStaticMarkup } from 'react-dom/server'
 
 import { composePromptWithSelection, createDiffPreviewFlow, determineUserInput } from './App'
+import KeybindOverlay, { KEYBIND_SHORTCUTS, resolveKeybindOverlayState } from './KeybindOverlay'
 
 test('determineUserInput returns selection context with line range header', () => {
   const leftText = Array.from({ length: 12 }, (_, idx) => `line-${idx + 1}`).join('\n')
@@ -78,4 +80,41 @@ test('diff preview requires approval before applying', () => {
   assert.equal(open, false)
   assert.equal(left, right)
   assert.equal(patches.length, 2)
+})
+
+test('keybind overlay toggles on ? and closes on Esc', () => {
+  const baseEvent = (key: string, overrides: Partial<Parameters<typeof resolveKeybindOverlayState>[1]> = {}) => ({
+    key,
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: key === '?',
+    target: undefined,
+    ...overrides
+  })
+
+  let state = false
+  state = resolveKeybindOverlayState(state, baseEvent('?'))
+  assert.equal(state, true)
+
+  state = resolveKeybindOverlayState(state, baseEvent('?'))
+  assert.equal(state, false)
+
+  state = resolveKeybindOverlayState(true, baseEvent('Escape'))
+  assert.equal(state, false)
+
+  state = resolveKeybindOverlayState(false, baseEvent('?', { ctrlKey: true }))
+  assert.equal(state, false)
+})
+
+test('keybind overlay lists primary shortcuts from spec link', () => {
+  const markup = renderToStaticMarkup(<KeybindOverlay open onClose={() => {}} />)
+  for (const shortcut of ['Ctrl/Cmd+Enter', 'Ctrl/Cmd+S', 'Ctrl/Cmd+C', '? / Esc']) {
+    assert.ok(markup.includes(shortcut))
+  }
+  assert.ok(markup.includes('主要ショートカット'))
+  assert.deepEqual(
+    KEYBIND_SHORTCUTS.map(item => item.keys),
+    ['Ctrl/Cmd+Enter', 'Ctrl/Cmd+S', 'Ctrl/Cmd+C', '? / Esc']
+  )
 })
