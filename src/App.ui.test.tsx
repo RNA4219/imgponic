@@ -1,8 +1,33 @@
-import { afterEach, expect, test, vi } from 'vitest'
+import { JSDOM } from 'jsdom'
+import { afterAll, afterEach, expect, test, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
+
+const domInstance = new JSDOM('<!DOCTYPE html><html><body></body></html>')
+
+if (!globalThis.window) {
+  const { window } = domInstance
+  const { document, navigator } = window
+
+  Object.assign(globalThis, { window, document, navigator })
+  Object.assign(globalThis, window)
+
+  const constructorKeys: Array<'HTMLElement' | 'HTMLButtonElement' | 'HTMLInputElement' | 'HTMLTextAreaElement'> = [
+    'HTMLElement',
+    'HTMLButtonElement',
+    'HTMLInputElement',
+    'HTMLTextAreaElement'
+  ]
+
+  for (const key of constructorKeys) {
+    const value = window[key]
+    if (typeof value === 'function') {
+      Object.assign(globalThis, { [key]: value })
+    }
+  }
+}
 
 const streamModule = await import('./useOllamaStream')
 const setupModule = await import('./useSetupCheck')
@@ -66,6 +91,10 @@ const noopStream = {
 
 afterEach(() => {
   appMockContainer.__APP_MOCKS__ = undefined
+})
+
+afterAll(() => {
+  domInstance.window.close()
 })
 
 domTest('renders setup guidance banner when offline and retries on demand', async () => {
