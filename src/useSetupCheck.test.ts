@@ -113,4 +113,36 @@ describe('useSetupCheck', () => {
 
     await hook.unmount()
   })
+
+  it('normalizes snake_case statuses returned by tauri backend', async () => {
+    vi.mocked(invoke).mockResolvedValueOnce({ status: 'ready' })
+
+    const readyHook = await renderHook('phi')
+    await flushEffects()
+
+    expect(readyHook.result.current.status).toBe('ok')
+    expect(readyHook.result.current.guidance).toBe('')
+
+    await readyHook.unmount()
+
+    vi.mocked(invoke).mockResolvedValueOnce({ status: 'server_unavailable' })
+
+    const offlineHook = await renderHook('phi')
+    await flushEffects()
+
+    expect(offlineHook.result.current.status).toBe('offline')
+    expect(offlineHook.result.current.guidance).toContain('Ollama')
+
+    await offlineHook.unmount()
+
+    vi.mocked(invoke).mockResolvedValueOnce({ status: 'model_missing', guidance: 'install from backend' })
+
+    const missingHook = await renderHook('phi')
+    await flushEffects()
+
+    expect(missingHook.result.current.status).toBe('missing-model')
+    expect(missingHook.result.current.guidance).toBe('install from backend')
+
+    await missingHook.unmount()
+  })
 })
