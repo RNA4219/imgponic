@@ -7,7 +7,7 @@ import './app.css'
 import { containsDangerWords } from './security/dangerWords'
 import { useOllamaStream } from './useOllamaStream'
 import KeybindOverlay, { resolveKeybindOverlayState } from './KeybindOverlay'
-import { containsDangerWord } from './security/dangerWords'
+import { sanitizeUserInput, SanitizedUserInput } from './security/sanitizeUserInput'
 
 export type ComposeResult = { final_prompt: string; sha256: string; model: string }
 type InvokeFunction = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
@@ -58,6 +58,21 @@ export const determineUserInput = (
   return `[Lines ${startLineIndex + 1}-${endLineIndex + 1}]\n${contextText}`
 }
 
+type SanitizedSnapshot = SanitizedUserInput & { raw: string }
+
+type ComposePromptOptions = {
+  invokeFn?: InvokeFunction
+  params: Record<string, unknown>
+  recipePath: string
+  leftText: string
+  sendSelectionOnly: boolean
+  selection: string
+  selectionStart: number | null
+  selectionEnd: number | null
+  contextRadius?: number
+  onSanitized?: (snapshot: SanitizedSnapshot) => void
+}
+
 export const composePromptWithSelection = async (
   {
     invokeFn = invoke,
@@ -68,20 +83,14 @@ export const composePromptWithSelection = async (
     selection,
     selectionStart,
     selectionEnd,
-    contextRadius
-  }: {
-    invokeFn?: InvokeFunction
-    params: Record<string, unknown>
-    recipePath: string
-    leftText: string
-    sendSelectionOnly: boolean
-    selection: string
-    selectionStart: number | null
-    selectionEnd: number | null
-    contextRadius?: number
-  }
+    contextRadius,
+    onSanitized
+  }: ComposePromptOptions
 ): Promise<ComposeResult> => {
-  const userInput = determineUserInput(sendSelectionOnly, selection, leftText, selectionStart, selectionEnd, contextRadius)
+  const rawUserInput = determineUserInput(sendSelectionOnly, selection, leftText, selectionStart, selectionEnd, contextRadius)
+  const sanitized = sanitizeUserInput(rawUserInput)
+  onSanitized?.({ ...sanitized, raw: rawUserInput })
+  const userInput = sanitized.overLimit ? rawUserInput : sanitized.sanitized
   const res = await invokeFn('compose_prompt', { recipePath, inlineParams: { ...params, user_input: userInput } })
   return res as ComposeResult
 }
@@ -306,7 +315,10 @@ export default function App() {
       selection: leftSelection,
       selectionStart: leftSelectionStart,
       selectionEnd: leftSelectionEnd,
-      contextRadius: 3
+      contextRadius: 3,
+      onSanitized: snapshot => {
+        setUserInputWarnings({ maskedTypes: snapshot.maskedTypes, overLimit: snapshot.overLimit })
+      }
     })
     setComposed(res)
     return res
@@ -339,7 +351,20 @@ export default function App() {
   const diffFlow = useMemo(() => createDiffPreviewFlow({ readLeft: () => leftText, readRight: () => rightText, show: value => setDiffPatch(value), apply: value => setLeftText(value), close: () => setDiffPatch(null) }), [leftText, rightText])
   const { open: openDiffPreview, confirm: confirmDiffPreview, cancel: cancelDiffPreview } = diffFlow
 
-  const selectionPreview = determineUserInput(sendSelectionOnly, leftSelection, leftText, leftSelectionStart, leftSelectionEnd, 3)
+  const rawUserInput = useMemo(
+    () => determineUserInput(sendSelectionOnly, leftSelection, leftText, leftSelectionStart, leftSelectionEnd, 3),
+    [sendSelectionOnly, leftSelection, leftText, leftSelectionStart, leftSelectionEnd]
+  )
+  const sanitization = useMemo(() => sanitizeUserInput(rawUserInput), [rawUserInput])
+  const sanitizedPreview = sanitization.overLimit ? rawUserInput : sanitization.sanitized
+  const [userInputWarnings, setUserInputWarnings] = useState<{ maskedTypes: string[]; overLimit: boolean }>(() => ({
+    maskedTypes: sanitization.maskedTypes,
+    overLimit: sanitization.overLimit
+  }))
+
+  useEffect(() => {
+    setUserInputWarnings({ maskedTypes: sanitization.maskedTypes, overLimit: sanitization.overLimit })
+  }, [sanitization])
 
   const handleLeftSelection = useCallback((target: HTMLTextAreaElement) => {
     const { selectionStart, selectionEnd, value } = target
@@ -545,16 +570,22 @@ export default function App() {
           <label className="toolbar" style={{ gap: 6, alignItems: 'center' }}>
             <input type="checkbox" checked={sendSelectionOnly} onChange={e => setSendSelectionOnly(e.target.checked)} />
             <span>選択のみ送る</span>
-            <span className="badge">{formatSelectionSummary(sendSelectionOnly, leftSelection, selectionPreview)}</span>
+            <span className="badge">{formatSelectionSummary(sendSelectionOnly, leftSelection, sanitizedPreview)}</span>
           </label>
-          {leftHasDangerWord && (
-            <span className="badge" data-testid="danger-word-warning" title="危険語が含まれています">
-              ⚠️ 危険語検出
+          {userInputWarnings.maskedTypes.length > 0 && (
+            <span className="badge" data-testid="mask-warning">秘密情報をマスクしました</span>
+          )}
+          {userInputWarnings.maskedTypes.length > 0 && (
+            <span className="badge" style={{ fontSize: 11 }}>
+              {userInputWarnings.maskedTypes.join(', ')}
             </span>
+          )}
+          {userInputWarnings.overLimit && (
+            <span className="badge" data-testid="limit-warning">4万字超</span>
           )}
           <details style={{ maxWidth: 280 }}>
             <summary>送信範囲プレビュー</summary>
-            <pre style={{ marginTop: 8, maxHeight: 180, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{selectionPreview || '(なし)'}</pre>
+            <pre style={{ marginTop: 8, maxHeight: 180, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{sanitizedPreview || '(なし)'}</pre>
           </details>
           {composed && <div className="badge">SHA-256: {composed.sha256.slice(0,16)}…</div>}
           {isStreaming && <span>Streaming...</span>}
