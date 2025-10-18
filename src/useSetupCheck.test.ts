@@ -1,5 +1,4 @@
-import React from 'react'
-import { act } from 'react-dom/test-utils'
+import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -39,14 +38,14 @@ const renderHook = async (model: string): Promise<RenderHookResult> => {
   }
 
   await act(async () => {
-    root.render(<TestComponent currentModel={model} />)
+    root.render(React.createElement(TestComponent, { currentModel: model }))
   })
 
   return {
     result,
     rerender: async nextModel => {
       await act(async () => {
-        root.render(<TestComponent currentModel={nextModel} />)
+        root.render(React.createElement(TestComponent, { currentModel: nextModel }))
       })
     },
     unmount: async () => {

@@ -20,13 +20,20 @@ const tokens = [
   '--shadow',
 ];
 
-const escapeRegExp = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
-
 const getBlock = (selector: string): string => {
-  const pattern = new RegExp(`${escapeRegExp(selector)}\\s*\\{[\\s\\S]*?\\}`, 'g');
-  const match = css.match(pattern);
-  return match?.join('\n') ?? '';
+  const start = css.indexOf(selector);
+  if (start < 0) return '';
+  const open = css.indexOf('{', start + selector.length);
+  if (open < 0) return '';
+  let depth = 1;
+  let idx = open + 1;
+  while (idx < css.length && depth > 0) {
+    const char = css[idx];
+    if (char === '{') depth += 1;
+    if (char === '}') depth -= 1;
+    idx += 1;
+  }
+  return css.slice(start, idx);
 };
 
 describe('theme tokens', () => {
