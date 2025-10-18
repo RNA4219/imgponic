@@ -45,6 +45,11 @@ mod tests {
                 SetupStatus::Ready,
             ),
             (
+                r#"{"models":[{"name":"phi"}]}"#,
+                Some("llama2"),
+                SetupStatus::ModelMissing,
+            ),
+            (
                 r#"{"models":[{"model":"phi"}]}"#,
                 Some("llama2"),
                 SetupStatus::ModelMissing,
