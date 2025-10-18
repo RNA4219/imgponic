@@ -273,9 +273,10 @@ v0.3のMVPはローカル整形・コーデモッドの“ループ最短化”�
 
 ## 13. マイルストーン / ロードマップ
 
-- **v0.4.0**：Streaming / 選択送信 / タブv2 / 初回セットアップ / LICENSE+CHANGELOG
-- **v0.4.1**：差分プレビュー / 機密マスク / サイズ上限 / workspace.bak
-- **v0.4.2**：CI整備 / Issueテンプレ / Diagnostics / Export/Import
+- **v0.4.0**：Streaming / タブv2 / 初回セットアップ / LICENSE+CHANGELOG
+- **v0.4.1**：Workspace v2 / 差分プレビュー / 機密マスク / サイズ上限 / workspace.bak
+- **v0.4.2**：CI整備 / Issueテンプレ / Docs整備 / Diagnostics / Export/Import
+- **完了済み**（v0.4.0）：選択送信
 - **v0.5.0**：Monaco遅延ロード / JSONスキーマ検証 / コーデモッド差分適用の安定化
 
 ---
