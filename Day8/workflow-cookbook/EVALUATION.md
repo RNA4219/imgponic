@@ -12,6 +12,7 @@ next_review_due: 2025-11-14
 
 - 必須要件（フォーマット・件数・整合性など）
 - PR本文に Priority Score（値と根拠）が記録されていること。
+- PR本文には整形スクリプト（例: `scripts/format.sh`）の最新実行ログを添付し、PRテンプレート（[.github/pull_request_template.md](../../.github/pull_request_template.md)）の指針に従うこと（決定: [IN-20250310-001](../../docs/IN-20250310-001.md)）。
 - governance/policy.yaml の forbidden_paths を変更しないこと。
 - インシデント発生時は
   [`docs/INCIDENT_TEMPLATE.md`](../../docs/INCIDENT_TEMPLATE.md) に沿って作成し、
