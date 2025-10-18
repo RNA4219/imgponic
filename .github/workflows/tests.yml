@@ -71,7 +71,17 @@ jobs:
         run: cargo clippy -- -D warnings
 
       - name: Run tests
-        run: cargo test
+        run: |
+          set -o pipefail
+          mkdir -p artifacts
+          RUST_BACKTRACE=1 CARGO_TERM_COLOR=always cargo test -- --nocapture | tee artifacts/cargo-test.log
+
+      - name: Upload cargo test log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-test-log
+          path: artifacts/cargo-test.log
 
   completion:
     runs-on: ubuntu-latest
