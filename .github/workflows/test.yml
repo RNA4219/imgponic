@@ -22,7 +22,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
       - name: ESLint (if exists)
         run: |
           set -Eeuo pipefail
@@ -52,7 +51,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
       - name: TypeScript (if exists)
         run: |
           set -Eeuo pipefail
@@ -82,7 +80,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
       - name: Node unit (repo root)
         if: ${{ hashFiles('package.json') != '' }}
         run: |
