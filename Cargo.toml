@@ -10,13 +10,10 @@ gtk4 = [
     "dep:tauri-plugin-fs",
     "dep:tauri-plugin-dialog",
     "dep:tauri-plugin-clipboard-manager",
-    "tauri/gtk4",
-    "tauri-plugin-fs/native",
-    "tauri-plugin-dialog/native",
-    "tauri-plugin-clipboard-manager/native",
 ]
 # 互換レイヤー追加時の集約用エイリアス。新規レイヤーは gtk4 へ統合すること。
 gtk4_compat = ["gtk4"]
+security = ["dep:glib_security"]
 
 [dependencies]
 tauri = { version = "2", features = [], optional = true }
@@ -34,6 +31,7 @@ futures-util = "0.3"
 tauri-plugin-fs = { version = "2", optional = true }
 tauri-plugin-dialog = { version = "2", optional = true }
 tauri-plugin-clipboard-manager = { version = "2", optional = true }
+glib_security = { package = "glib", version = "0.20", optional = true }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -45,6 +43,7 @@ tempfile = "3"
 [[test]]
 name = "glib_stack"
 path = "tests/security/glib_stack.rs"
+required-features = ["security"]
 
 [[test]]
 name = "plugin_registration"
