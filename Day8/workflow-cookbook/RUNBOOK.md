@@ -29,8 +29,13 @@ next_review_due: 2025-11-14
     `runs/` 配下は CI アーティファクトとして保存し、トリアージ用にダウンロードできるようにする。
 - **Prod**
   - 常設の本番環境は提供されていない。配布が必要な場合は署名済み端末で
-    `npm run tauri:build` を実行し、生成された `src-tauri/target/release/bundle/` 配下の成果物を
-    夜間リグレッション代替として配布・検証する。
+    `npm run tauri:build` を実行し、生成された `target/release/bundle/` 配下（例: `target/release/bundle/macos/PromptForge.app`、
+    `target/release/bundle/msi/PromptForge_x64_en-US.msi`）を収集する。
+  - Tauri 2.x ではビルドログが `npm run tauri:build` を実行したターミナルへ標準出力される。署名情報は
+    `tauri.conf.json` の `bundle.windows.signingIdentity` / `bundle.macos.signingIdentity` を利用するか、
+    手動署名の場合は macOS で `codesign --timestamp --sign <IDENTITY> PromptForge.app`、Windows で
+    `signtool sign /tr http://timestamp.digicert.com /td sha256 /fd sha256 PromptForge_x64_en-US.msi` を行う。
+    署名後の成果物を対象 OS ごとの `target/release/bundle/<platform>/` へ戻してから配布し、夜間リグレッション代替として検証する。
 
 ## Execute
 
