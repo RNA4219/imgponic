@@ -225,20 +225,11 @@ async fn run_ollama_chat(
     Ok(txt)
 }
 
-#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
-async fn check_ollama_setup(
-    base_url: Option<String>,
-    model: Option<String>,
-) -> std::result::Result<setup_check::SetupCheckOutcome, String> {
-    crate::setup_check::check_ollama_setup(base_url, model).await
-}
-
-#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
-async fn run_ollama_stream(
+#[cfg(feature = "gtk4")]
+#[cfg_attr(feature = "gtk4", tauri::command)]
+async fn run_ollama_stream_impl(
     window: tauri::Window,
-    state: tauri::State<'_, StreamState>,
+    state: &StreamState,
     model: String,
     system_text: String,
     user_text: String,
@@ -259,12 +250,12 @@ async fn run_ollama_stream(
     };
 
     let (handle, registration) = AbortHandle::new_pair();
-    let (stream_id, previous) = state.inner().register(handle).await;
+    let (stream_id, previous) = state.register(handle).await;
     if let Some(prev) = previous {
         prev.abort();
     }
 
-    let state_for_task = state.inner().clone();
+    let state_for_task = state.clone();
     let state_for_cleanup = state_for_task.clone();
     let window_for_task = window.clone();
 
@@ -363,8 +354,19 @@ async fn run_ollama_stream(
     Ok(())
 }
 
-#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
+#[cfg_attr(feature = "gtk4", tauri::command)]
+async fn run_ollama_stream(
+    window: tauri::Window,
+    state: tauri::State<'_, StreamState>,
+    model: String,
+    system_text: String,
+    user_text: String,
+) -> Result<(), String> {
+    run_ollama_stream_impl(window, state.inner(), model, system_text, user_text).await
+}
+
+#[cfg(feature = "gtk4")]
+#[cfg_attr(feature = "gtk4", tauri::command)]
 async fn abort_current_stream(state: tauri::State<'_, StreamState>) -> Result<(), String> {
     if let Some(handle) = state.inner().take().await {
         handle.abort();

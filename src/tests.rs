@@ -312,6 +312,20 @@ mod ollama_stream_integration {
     }
 
     #[tokio::test]
+    async fn run_ollama_stream_emits_multiple_jsonl_lines_from_single_chunk() {
+        let expected_first = "{\"response\":\"first\",\"done\":false}\n".to_string();
+        let expected_second = "{\"response\":\"second\",\"done\":true}\n".to_string();
+        let combined = format!("{}{}", expected_first, expected_second);
+        let (jsonl_lines, aggregated) = collect_stream(vec![combined], 2).await;
+
+        assert_eq!(
+            jsonl_lines,
+            vec![expected_first.clone(), expected_second.clone()]
+        );
+        assert_eq!(aggregated, format!("{}{}", expected_first, expected_second));
+    }
+
+    #[tokio::test]
     async fn run_ollama_stream_handles_fragmented_chunks_without_loss() {
         let expected_first = "{\"response\":\"alpha \",\"done\":false}\n".to_string();
         let expected_second = "{\"response\":\"beta\",\"done\":true}\n".to_string();
