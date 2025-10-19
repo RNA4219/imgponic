@@ -7,7 +7,12 @@ type UnlistenFn = () => void | Promise<void>
 
 type StreamArgs = { model: string; systemText: string; userText: string }
 
-type StreamHandlers = { onChunk?: (chunk: string) => void; onEnd?: () => void; onError?: (message: string) => void }
+type StreamHandlers = {
+  onChunk?: (chunk: string) => void
+  onJsonl?: (jsonl: string) => void
+  onEnd?: () => void
+  onError?: (message: string) => void
+}
 
 type StreamState = { startStream: (args: StreamArgs) => Promise<void>; abortStream: () => Promise<void>; appendChunk: (chunk: string) => void; isStreaming: boolean }
 
@@ -20,6 +25,7 @@ export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
   useEffect(() => { handlerRef.current = handlers }, [handlers])
 
   const appendChunk = useCallback((chunk: string) => handlerRef.current.onChunk?.(chunk), [])
+  const appendJsonl = useCallback((jsonl: string) => handlerRef.current.onJsonl?.(jsonl), [])
 
   const clearListeners = useCallback(async () => {
     const current = unlistenRef.current
@@ -46,6 +52,7 @@ export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
     const register = async (name: string, cb: (event: unknown) => void) =>
       unlisteners.push(await window.listen(name, cb as (event: unknown) => void))
     await register('ollama:chunk', (event: { payload: string }) => appendChunk(event.payload))
+    await register('ollama:jsonl', (event: { payload: string }) => appendJsonl(event.payload))
     await register('ollama:end', () => finalize('end'))
     await register('ollama:error', event => finalize('error', (event as { payload?: unknown }).payload))
     unlistenRef.current = unlisteners
@@ -55,7 +62,7 @@ export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
       finalize('error', error)
       throw error
     }
-  }, [appendChunk, finalize])
+  }, [appendChunk, appendJsonl, finalize])
 
   const abortStream = useCallback(async () => {
     if (!streamingRef.current) return
@@ -155,6 +162,18 @@ if (import.meta.vitest) {
       listeners['ollama:chunk']?.({ payload: 'late' })
       expect(chunks).toEqual(['late'])
       await act(async () => { listeners['ollama:end']?.({}); await startPromise })
+      unmount()
+    })
+
+    it('forwards raw jsonl events to the provided handler', async () => {
+      const jsonlLines: string[] = []
+      const { result, unmount } = mount({ onJsonl: line => jsonlLines.push(line) })
+      const startPromise = result.current?.startStream({ model: 'm', systemText: 's', userText: 'u' }) ?? Promise.resolve()
+      await act(async () => { await Promise.resolve() })
+      listeners['ollama:jsonl']?.({ payload: '{"response":"hi"}\n' })
+      listeners['ollama:jsonl']?.({ payload: '{"done":true}' })
+      expect(jsonlLines).toEqual(['{"response":"hi"}\n', '{"done":true}'])
+      await act(async () => { listeners['ollama:end']?.({}); resolveRun?.(); await startPromise })
       unmount()
     })
   })

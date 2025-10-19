@@ -225,6 +225,7 @@ export default function App() {
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
   const streamedResponseRef = useRef<string>('')
+  const streamedJsonlRef = useRef<string>('')
   const hasSavedRunRef = useRef<boolean>(false)
   const updateLeftText = useCallback((value: string) => {
     setLeftText(value)
@@ -233,6 +234,7 @@ export default function App() {
 
   const clearStreamedResponse = useCallback((options?: { markSaved?: boolean }) => {
     streamedResponseRef.current = ''
+    streamedJsonlRef.current = ''
     hasSavedRunRef.current = options?.markSaved ?? false
     setRightText('')
   }, [])
@@ -243,6 +245,9 @@ export default function App() {
         streamedResponseRef.current += chunk
         setRightText(prev => prev + chunk)
       },
+      onJsonl: (jsonl: string) => {
+        streamedJsonlRef.current += jsonl
+      },
       onEnd: async () => {
         setRunning(false)
         if (hasSavedRunRef.current) return
@@ -251,6 +256,7 @@ export default function App() {
           await invokeFn<string>('save_run', {
             recipePath,
             final_prompt: composedRef.current?.final_prompt ?? '',
+            response_jsonl: streamedJsonlRef.current,
             response_text: streamedResponseRef.current
           })
         } catch (error) {
