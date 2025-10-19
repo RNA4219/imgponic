@@ -476,6 +476,91 @@ domTest('startStream receives sanitized user text without prompt labels', async 
   }
 })
 
+domTest('re-composes prompt with updated user input after state changes before run', async () => {
+  const startStream = vi.fn(async () => {}), abortStream = vi.fn(async () => {})
+  const useOllamaStreamMock = vi.fn(() => ({ startStream, abortStream, appendChunk: vi.fn(), isStreaming: false }))
+  const invokeMock = vi.fn(async (cmd: string, args?: Record<string, unknown>) => {
+    if (cmd === 'read_workspace') return null
+    if (cmd === 'write_workspace') return 'ok'
+    if (cmd === 'list_project_files') return []
+    if (cmd === 'compose_prompt') {
+      const inline = (args?.inlineParams ?? {}) as Record<string, unknown>
+      const userInput = typeof inline.user_input === 'string' ? inline.user_input : ''
+      return {
+        final_prompt: ['SYS instructions', '---', 'USER_INPUT', '```text', userInput, '```'].join('\n'),
+        sha256: 'hash',
+        model: 'm'
+      }
+    }
+    if (cmd === 'run_ollama_stream' || cmd === 'save_run') return undefined
+    return undefined
+  })
+
+  appMockContainer.__APP_MOCKS__ = { useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }), useOllamaStream: useOllamaStreamMock, invoke: invokeMock }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+  const composeCalls = () => invokeMock.mock.calls.filter(call => call[0] === 'compose_prompt')
+  const getRunButton = () =>
+    Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('▶ 実行')) ?? null
+
+  try {
+    await act(async () => {
+      root.render(<App />)
+    })
+
+    const runButton = await waitForElement(getRunButton, 'run button')
+    const run = () =>
+      act(async () => {
+        runButton.click()
+        await Promise.resolve()
+      })
+
+    await run()
+    const firstCall = ((composeCalls()[0]?.[1] ?? {}) as { inlineParams?: Record<string, unknown> }).inlineParams
+    expect(firstCall?.user_input).toMatch('ここに入力')
+
+    const leftTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="left"]'),
+      'left textarea'
+    )
+    if (!(leftTextarea instanceof HTMLTextAreaElement)) throw new Error('Expected left textarea')
+
+    const selectLines = () =>
+      act(async () => {
+        leftTextarea.focus()
+        leftTextarea.setSelectionRange(6, 11)
+        leftTextarea.dispatchEvent(new Event('select', { bubbles: true }))
+      })
+
+    await act(async () => {
+      leftTextarea.value = 'line1\nline2\nline3'
+      leftTextarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await selectLines()
+
+    const sendSelectionCheckbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement | null
+    if (!sendSelectionCheckbox) throw new Error('Expected selection checkbox')
+
+    await act(async () => {
+      sendSelectionCheckbox.checked = true
+      sendSelectionCheckbox.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await selectLines()
+    await flushEffects()
+
+    await run()
+    const secondCall = ((composeCalls()[1]?.[1] ?? {}) as { inlineParams?: Record<string, unknown> }).inlineParams
+    expect(secondCall?.user_input).toBe('line1\nline2\nline3')
+    expect(secondCall?.user_input).not.toBe(firstCall?.user_input)
+  } finally {
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  }
+})
+
 domTest('Ctrl/Cmd+Shift+F toggles focus mode and reset button restores layout', async () => {
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({
