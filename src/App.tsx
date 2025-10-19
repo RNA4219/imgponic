@@ -237,16 +237,6 @@ export default function App() {
     setRightText('')
   }, [])
 
-  const handleStreamError = useCallback(
-    (message: string) => {
-      console.error('ollama stream error', message)
-      setRunning(false)
-      setOllamaError(describeOllamaError(message))
-      clearStreamedResponse({ markSaved: true })
-    },
-    [clearStreamedResponse, setOllamaError, setRunning]
-  )
-
   const streamHandlers = useMemo(
     () => ({
       onChunk: (chunk: string) => {
@@ -269,11 +259,15 @@ export default function App() {
           clearStreamedResponse({ markSaved: true })
         }
       },
-      onError: handleStreamError
+      onError: (message: string) => {
+        console.error('ollama stream error', message)
+        setRunning(false)
+        setOllamaError(describeOllamaError(message))
+        clearStreamedResponse({ markSaved: true })
+      }
     }),
     [
       clearStreamedResponse,
-      handleStreamError,
       invokeFn,
       recipePath,
       setOllamaError,
