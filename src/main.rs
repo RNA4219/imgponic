@@ -1,11 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![cfg_attr(not(feature = "gtk4"), allow(dead_code))]
+#![cfg_attr(not(any(feature = "gtk4", feature = "gtk4_compat")), allow(dead_code))]
 
 mod ollama_stream;
 mod setup_check;
 mod txt_excerpt;
 
-#[cfg(all(test, feature = "gtk4"))]
+#[cfg(all(test, any(feature = "gtk4", feature = "gtk4_compat")))]
 mod tests;
 
 use std::env;
@@ -15,19 +15,17 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use chrono::Local;
-#[cfg(feature = "gtk4")]
+#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
 use futures_util::future::{AbortHandle, Abortable};
-#[cfg(feature = "gtk4")]
+#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-#[cfg(feature = "gtk4")]
+#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
 use tauri::{Emitter, Manager};
 
-#[cfg(feature = "gtk4")]
+#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
 use crate::ollama_stream::{emit_events_for_line, parse_ollama_jsonl_line, StreamState};
-#[cfg(feature = "gtk4")]
-use crate::setup_check::check_ollama_setup;
 
 #[derive(Debug, Deserialize)]
 struct Recipe {
@@ -77,7 +75,7 @@ fn render_placeholders(s: &str, params: &serde_json::Value) -> String {
     out
 }
 
-#[cfg_attr(feature = "gtk4", tauri::command)]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
 fn compose_prompt(
     recipe_path: String,
     inline_params: serde_json::Value,
@@ -194,7 +192,7 @@ struct ChatPayload {
     messages: Vec<ChatMessage>,
 }
 
-#[cfg_attr(feature = "gtk4", tauri::command)]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
 async fn run_ollama_chat(
     model: String,
     system_text: String,
@@ -227,8 +225,17 @@ async fn run_ollama_chat(
     Ok(txt)
 }
 
-#[cfg(feature = "gtk4")]
-#[cfg_attr(feature = "gtk4", tauri::command)]
+#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
+async fn check_ollama_setup(
+    base_url: Option<String>,
+    model: Option<String>,
+) -> std::result::Result<setup_check::SetupCheckOutcome, String> {
+    crate::setup_check::check_ollama_setup(base_url, model).await
+}
+
+#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
 async fn run_ollama_stream(
     window: tauri::Window,
     state: tauri::State<'_, StreamState>,
@@ -356,8 +363,8 @@ async fn run_ollama_stream(
     Ok(())
 }
 
-#[cfg(feature = "gtk4")]
-#[cfg_attr(feature = "gtk4", tauri::command)]
+#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
 async fn abort_current_stream(state: tauri::State<'_, StreamState>) -> Result<(), String> {
     if let Some(handle) = state.inner().take().await {
         handle.abort();
@@ -365,7 +372,7 @@ async fn abort_current_stream(state: tauri::State<'_, StreamState>) -> Result<()
     Ok(())
 }
 
-#[cfg_attr(feature = "gtk4", tauri::command)]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
 fn save_run(
     recipe_path: String,
     final_prompt: String,
@@ -438,7 +445,7 @@ fn normalize_prompt_kind(kind: String) -> Result<String, String> {
     }
 }
 
-#[cfg_attr(feature = "gtk4", tauri::command)]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
 fn list_prompt_files(kind: String) -> Result<Vec<PromptFileEntry>, String> {
     use walkdir::WalkDir;
 
@@ -467,7 +474,7 @@ fn list_prompt_files(kind: String) -> Result<Vec<PromptFileEntry>, String> {
     Ok(out)
 }
 
-#[cfg_attr(feature = "gtk4", tauri::command)]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
 fn read_prompt_file(rel_path: String) -> Result<FileContent, String> {
     let base = PathBuf::from("prompts");
     let path = base.join(&rel_path);
@@ -506,7 +513,7 @@ struct ProjectEntry {
     size: u64,
 }
 
-#[cfg_attr(feature = "gtk4", tauri::command)]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
 fn list_project_files(exts: Option<Vec<String>>) -> Result<Vec<ProjectEntry>, String> {
     use walkdir::WalkDir;
     let base = PathBuf::from("project");
@@ -548,7 +555,7 @@ struct FileContent {
     content: String,
 }
 
-#[cfg_attr(feature = "gtk4", tauri::command)]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
 fn read_project_file(rel_path: String) -> Result<FileContent, String> {
     let base = PathBuf::from("project");
     let p = base.join(&rel_path);
@@ -564,7 +571,7 @@ fn read_project_file(rel_path: String) -> Result<FileContent, String> {
     })
 }
 
-#[cfg_attr(feature = "gtk4", tauri::command)]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
 fn write_project_file(rel_path: String, content: String) -> Result<String, String> {
     let base = PathBuf::from("project");
     let p = base.join(&rel_path);
@@ -578,7 +585,7 @@ fn write_project_file(rel_path: String, content: String) -> Result<String, Strin
 }
 
 // ---------- Corpus excerpts ----------
-#[cfg_attr(feature = "gtk4", tauri::command)]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
 fn load_txt_excerpt(
     path: String,
     max_bytes: Option<u64>,
@@ -599,22 +606,22 @@ struct Workspace {
     updated_at: String,
 }
 
-#[cfg(all(test, feature = "gtk4"))]
+#[cfg(all(test, any(feature = "gtk4", feature = "gtk4_compat")))]
 pub mod workspace_test_support {
     pub use super::{workspace_path, write_workspace, Workspace};
 }
 
-#[cfg(all(test, feature = "gtk4"))]
+#[cfg(all(test, any(feature = "gtk4", feature = "gtk4_compat")))]
 pub mod project_test_support {
     pub use super::{read_project_file, write_project_file, FileContent};
 }
 
-#[cfg(all(test, feature = "gtk4"))]
+#[cfg(all(test, any(feature = "gtk4", feature = "gtk4_compat")))]
 pub mod prompt_test_support {
     pub use super::{list_prompt_files, read_prompt_file, FileContent, PromptFileEntry};
 }
 
-#[cfg(feature = "gtk4")]
+#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
 fn workspace_path(app: &tauri::AppHandle) -> PathBuf {
     if let Some(mut p) = app.path_resolver().app_data_dir() {
         p.push("workspace.json");
@@ -623,8 +630,8 @@ fn workspace_path(app: &tauri::AppHandle) -> PathBuf {
     PathBuf::from("workspace.json")
 }
 
-#[cfg(feature = "gtk4")]
-#[cfg_attr(feature = "gtk4", tauri::command)]
+#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
 fn read_workspace(app: tauri::AppHandle) -> Result<Option<Workspace>, String> {
     let p = workspace_path(&app);
     match fs::read_to_string(&p) {
@@ -642,8 +649,8 @@ fn read_workspace(app: tauri::AppHandle) -> Result<Option<Workspace>, String> {
     }
 }
 
-#[cfg(feature = "gtk4")]
-#[cfg_attr(feature = "gtk4", tauri::command)]
+#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
+#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
 fn write_workspace(app: tauri::AppHandle, ws: Workspace) -> Result<String, String> {
     let p = workspace_path(&app);
     if let Some(dir) = p.parent() {
@@ -665,7 +672,7 @@ fn write_workspace(app: tauri::AppHandle, ws: Workspace) -> Result<String, Strin
     }
 }
 
-#[cfg(all(feature = "gtk4", target_os = "linux"))]
+#[cfg(all(any(feature = "gtk4", feature = "gtk4_compat"), target_os = "linux"))]
 #[allow(dead_code)]
 fn gtk4_widget_initialization_example() -> &'static str {
     r#"use gtk::prelude::*;
@@ -694,7 +701,7 @@ fn main() {
 "#
 }
 
-#[cfg(all(feature = "gtk4", target_os = "linux"))]
+#[cfg(all(any(feature = "gtk4", feature = "gtk4_compat"), target_os = "linux"))]
 fn apply_linux_overrides<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     // GTK4/Wayland では従来の X11 系ヒントが効かないため、明示設定は避ける
     builder.setup(|_| {
@@ -703,12 +710,15 @@ fn apply_linux_overrides<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri
     })
 }
 
-#[cfg(all(feature = "gtk4", not(target_os = "linux")))]
+#[cfg(all(
+    any(feature = "gtk4", feature = "gtk4_compat"),
+    not(target_os = "linux")
+))]
 fn apply_linux_overrides<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     builder
 }
 
-#[cfg(feature = "gtk4")]
+#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
 pub fn configure_builder<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     let builder = apply_linux_overrides(builder);
 
@@ -735,14 +745,14 @@ pub fn configure_builder<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri
         ])
 }
 
-#[cfg(feature = "gtk4")]
+#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
 fn main() {
     configure_builder(tauri::Builder::new())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
-#[cfg(not(feature = "gtk4"))]
+#[cfg(not(any(feature = "gtk4", feature = "gtk4_compat")))]
 fn main() {
     eprintln!("promptforge built without gtk4 feature; GUI runtime is disabled");
 }
