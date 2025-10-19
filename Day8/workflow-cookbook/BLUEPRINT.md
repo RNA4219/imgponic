@@ -81,7 +81,9 @@ next_review_due: 2025-11-14
 ### `check_ollama_setup`
 
 - **Input:** `model?: string`（UI で選択された推論モデル）。
-- **Output:** `{ status: 'ok' | 'offline' | 'missing-model', guidance: string }`。Ollama サービスの疎通とモデル有無を正規化し、`useSetupCheck` のリトライ案内へ渡す。
+- **Output:** `{ status: 'ok' | 'offline' | 'missing-model', guidance: string }`。
+  Ollama サービスの疎通とモデル有無を正規化し、
+  `useSetupCheck` のリトライ案内へ渡す。
 
 ## 5. Minimal Flow
 
