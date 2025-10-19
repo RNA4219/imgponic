@@ -71,3 +71,19 @@ package `promptforge` depends on `tauri` with feature `gtk4` but `tauri` does no
 
 failed to select a version for `tauri` which could resolve this conflict
 ```
+
+## 2025-02-15 試行メモ
+- `cargo test --all-features --workspace` を実行したところ、`tauri` の `gtk4` feature が存在しないため依存関係の解決に失敗。
+- 実行ログを `target/test.log` に保存済み。エラー内容は `tauri` が `gtk4` feature を提供していない点で、`promptforge` の依存関係が満たせなかった。
+
+### 参考ログ
+```
+error: failed to select a version for `tauri`.
+    ... required by package `promptforge v0.3.0 (/workspace/imgponic)`
+versions that meet the requirements `^2` (locked to 2.8.5) are: 2.8.5
+
+package `promptforge` depends on `tauri` with feature `gtk4` but `tauri` does not have that feature.
+
+
+failed to select a version for `tauri` which could resolve this conflict
+```
