@@ -39,6 +39,9 @@
 # Tauri GTK4 アップグレード検証ログ
 
 ## 2025-10-19 試行メモ
+- `cargo deny check bans` を実行し、`tauri` 2.8.5 由来の `glib = 0.18.5` が ban 設定に抵触することを確認。
+- 現時点で `glib` 0.20 系へ更新された `tauri`/`wry`/`tao` ブランチは未公開のため、`deny.toml` のしきい値を `< 0.18.5` に緩和。
+- **Next action:** 上流で GTK4/GLib ≥0.20 へ移行済みのリリース（または互換パッチ）が出次第、`deny.toml` を再更新し `glib` 0.20 以上を再要求する。
 - `conradhale/tao` (`rev=0fa97b7e3288bdda4b1a43a58117cdb154206d68`) と `conradhale/wry` (`rev=fdce27aca03b79682cb7779483bd69d25f0134c6`)
   を `[patch.crates-io]` へ設定し `cargo update -p wry` を実行。
 - しかし `tauri` が要求する `tao = "^0.34.4"` / `wry = "^0.53.4"` に対し、該当コミットの crate version は
