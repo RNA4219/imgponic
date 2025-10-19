@@ -235,19 +235,19 @@ export default function App() {
     setRightText('')
   }, [])
 
-  useOllamaStreamHook(
-    {
-      onChunk: chunk => setRightText(prev => prev + chunk),
-      onEnd: () => setRunning(false),
-      onError: message => {
-        console.error('ollama stream error', message)
-        setRunning(false)
-        setOllamaError(describeOllamaError(message))
-        clearStreamedResponse()
-      }
+  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
+    onChunk: chunk => {
+      streamedResponseRef.current = `${streamedResponseRef.current}${chunk}`
+      setRightText(prev => prev + chunk)
     },
-    [clearStreamedResponse]
-  )
+    onEnd: () => setRunning(false),
+    onError: message => {
+      console.error('ollama stream error', message)
+      setRunning(false)
+      setOllamaError(describeOllamaError(message))
+      clearStreamedResponse()
+    }
+  })
   const abortStream = useCallback(async () => {
     resetOllamaError()
     setRunning(false)
