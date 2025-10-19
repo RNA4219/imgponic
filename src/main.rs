@@ -653,9 +653,41 @@ fn write_workspace(app: tauri::AppHandle, ws: Workspace) -> Result<String, Strin
 }
 
 #[cfg(target_os = "linux")]
+#[allow(dead_code)]
+fn gtk4_widget_initialization_example() -> &'static str {
+    r#"use gtk::prelude::*;
+use gtk::{Application, ApplicationWindow, Box as GtkBox, Orientation};
+
+fn main() {
+    let app = Application::builder()
+        .application_id("com.promptforge.app")
+        .build();
+
+    app.connect_activate(|app| {
+        let window = ApplicationWindow::builder()
+            .application(app)
+            .title("PromptForge")
+            .default_width(1150)
+            .default_height(820)
+            .build();
+
+        let root = GtkBox::new(Orientation::Vertical, 0);
+        window.set_content(Some(&root));
+        window.present();
+    });
+
+    app.run();
+}
+"#
+}
+
+#[cfg(target_os = "linux")]
 fn apply_linux_overrides<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     // GTK4/Wayland では従来の X11 系ヒントが効かないため、明示設定は避ける
-    builder
+    builder.setup(|_| {
+        let _ = gtk4_widget_initialization_example();
+        Ok(())
+    })
 }
 
 #[cfg(not(target_os = "linux"))]
