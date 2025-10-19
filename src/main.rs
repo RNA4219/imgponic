@@ -18,6 +18,7 @@ use futures_util::future::{AbortHandle, Abortable};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tauri::{Emitter, Manager};
 
 use crate::ollama_stream::{parse_ollama_jsonl_chunk, OllamaEvent, StreamState};
 use crate::setup_check::check_ollama_setup;
@@ -633,7 +634,20 @@ fn write_workspace(app: tauri::AppHandle, ws: Workspace) -> Result<String, Strin
     }
 }
 
+#[cfg(target_os = "linux")]
+fn apply_linux_overrides<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    // GTK4/Wayland では従来の X11 系ヒントが効かないため、明示設定は避ける
+    builder
+}
+
+#[cfg(not(target_os = "linux"))]
+fn apply_linux_overrides<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    builder
+}
+
 pub fn configure_builder<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    let builder = apply_linux_overrides(builder);
+
     builder
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
