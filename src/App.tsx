@@ -449,7 +449,14 @@ export default function App() {
       return ''
     }
     const SAFE_PREVIEW_LENGTH = 40000
-    return base.length > SAFE_PREVIEW_LENGTH ? `${base.slice(0, SAFE_PREVIEW_LENGTH)}…` : base
+    if (base.length <= SAFE_PREVIEW_LENGTH) {
+      return base
+    }
+    const tailLength = Math.min(256, Math.floor(SAFE_PREVIEW_LENGTH / 4))
+    const tail = base.slice(-tailLength)
+    const headLength = Math.max(0, SAFE_PREVIEW_LENGTH - tail.length - 1)
+    const head = base.slice(0, headLength)
+    return `${head}…${tail}`
   }, [sanitization.sanitized])
   const [userInputWarnings, setUserInputWarnings] = useState<{ maskedTypes: string[]; overLimit: boolean }>(() => ({
     maskedTypes: sanitization.maskedTypes,
