@@ -32,6 +32,11 @@ tauri-plugin-fs = { version = "2", optional = true }
 tauri-plugin-dialog = { version = "2", optional = true }
 tauri-plugin-clipboard-manager = { version = "2", optional = true }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+muda = { version = "0.*", optional = true }
+tray-icon = { version = "0.*", optional = true }
+libappindicator = { version = "0.*", optional = true }
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
