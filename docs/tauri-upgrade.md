@@ -54,3 +54,20 @@ warning: Patch `muda v0.15.3 (https://github.com/tauri-apps/muda?rev=3a29ee84189
 Patch `tao v0.32.8 (https://github.com/conradhale/tao?rev=0fa97b7e3288bdda4b1a43a58117cdb154206d68#0fa97b7e)` was not used in the crate graph.
 Patch `wry v0.50.5 (https://github.com/conradhale/wry?rev=fdce27aca03b79682cb7779483bd69d25f0134c6#fdce27ac)` was not used in the crate graph.
 ```
+
+## 2025-02-14 試行メモ
+- `cargo clippy --all-targets --all-features -- -D warnings` を実行したところ、`tauri` に `gtk4` feature が存在せず依存関係の解決に失敗。
+- `Cargo.toml` では `gtk4` feature が `tauri/gtk4` を要求しているが、現在公開されている `tauri v2.8.5` には該当 feature が未実装のため解消不可。
+- `tauri` 側で `gtk4` feature を提供するブランチ公開待ち。既存の `[patch.crates-io]` 設定でも feature は追加されていないことを確認した。
+
+### 参考ログ
+```
+error: failed to select a version for `tauri`.
+    ... required by package `promptforge v0.3.0 (/workspace/imgponic)`
+versions that meet the requirements `^2` (locked to 2.8.5) are: 2.8.5
+
+package `promptforge` depends on `tauri` with feature `gtk4` but `tauri` does not have that feature.
+
+
+failed to select a version for `tauri` which could resolve this conflict
+```
