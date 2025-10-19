@@ -233,26 +233,10 @@ export default function App() {
   }, [])
 
   const appendStreamChunk = useCallback((chunk: string) => {
-    streamedResponseRef.current = `${streamedResponseRef.current}${chunk}`
-    setRightText(streamedResponseRef.current)
+    if (!chunk) return
+    streamedResponseRef.current += chunk
+    setRightText(prev => prev + chunk)
   }, [])
-
-  const handleStreamEnd = useCallback(async () => {
-    setRunning(false)
-    const composedSnapshot = composedRef.current
-    const responseText = streamedResponseRef.current
-    if (!composedSnapshot || !responseText) return
-    try {
-      await invokeFn('save_run', {
-        recipePath,
-        final_prompt: composedSnapshot.final_prompt,
-        response_text: responseText,
-        model: composedSnapshot.model
-      })
-    } catch (error) {
-      console.warn('save_run failed', error)
-    }
-  }, [invokeFn, recipePath])
 
   const handleStreamError = useCallback(
     (message: string) => {
@@ -263,6 +247,22 @@ export default function App() {
     },
     [clearStreamedResponse]
   )
+
+  const handleStreamEnd = useCallback(async () => {
+    setRunning(false)
+    const snapshot = composedRef.current
+    const responseText = streamedResponseRef.current
+    if (!snapshot || !responseText) return
+    try {
+      await invokeFn('save_run', {
+        recipePath,
+        final_prompt: snapshot.final_prompt,
+        response_text: responseText
+      })
+    } catch (error) {
+      console.error('save_run failed', error)
+    }
+  }, [invokeFn, recipePath])
 
   const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
     onChunk: appendStreamChunk,

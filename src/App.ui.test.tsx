@@ -526,6 +526,75 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
   }
 })
 
+domTest('runs stream once until completion and saves aggregated response', async () => {
+  let capturedHandlers: Parameters<UseOllamaStreamFn>[0] | null = null
+  let setStreamingState: React.Dispatch<React.SetStateAction<boolean>> | null = null
+  const startStream = vi.fn(async () => {})
+  const saveRunCalls: Array<Record<string, unknown> | undefined> = []
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),
+    useOllamaStream: handlers => {
+      capturedHandlers = handlers
+      const [streaming, setStreaming] = React.useState(false)
+      setStreamingState = setStreaming
+      return {
+        startStream: async args => { startStream(args); setStreaming(true) },
+        abortStream: async () => setStreaming(false),
+        appendChunk: handlers.onChunk ?? (() => {}),
+        isStreaming: streaming
+      }
+    },
+    invoke: async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'save_run') { saveRunCalls.push(args); return undefined }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+  const trigger = async (step: () => void | Promise<void>) => {
+    await act(async () => { await step() })
+    await flushEffects()
+  }
+
+  try {
+    await trigger(() => root.render(<App />))
+    const runButton = container.querySelector('.runpulse')
+    expect(runButton).toBeInstanceOf(HTMLButtonElement)
+    if (!(runButton instanceof HTMLButtonElement)) throw new Error('Expected run button')
+    const rightTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="right"]'),
+      'right textarea'
+    )
+
+    await trigger(() => runButton.click())
+    expect(startStream).toHaveBeenCalledTimes(1)
+
+    expect(saveRunCalls).toHaveLength(0)
+    await trigger(() => {
+      capturedHandlers?.onChunk?.('First chunk ')
+      capturedHandlers?.onChunk?.('Second chunk')
+    })
+    expect(rightTextarea.value).toBe('First chunk Second chunk')
+
+    await trigger(() => {
+      capturedHandlers?.onEnd?.()
+      setStreamingState?.(false)
+    })
+
+    expect(saveRunCalls).toHaveLength(1)
+    expect(saveRunCalls[0]).toMatchObject({ recipePath: 'data/recipes/demo.sora2.yaml', final_prompt: 'SYS\n---\nUSER_INPUT', response_text: 'First chunk Second chunk' })
+  } finally {
+    await act(async () => { root.unmount() })
+    container.remove()
+  }
+})
+
 domTest('aborting stream resets ollama error and calls abort once', async () => {
   const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
   const rawAbortStream = vi.fn(async () => {})
