@@ -2,7 +2,7 @@
 
 **版**: v0.3（MVP）  
 **日付**: 2025-10-18（Asia/Tokyo）  
-**スタック**: Rust（Tauri v1） + TypeScript（React + Vite） + Ollama（localhost:11434）
+**スタック**: Rust（Tauri v2 / `src/main.rs` エントリ） + TypeScript（React + Vite） + Ollama（localhost:11434）
 
 ---
 
@@ -41,10 +41,10 @@
 
 ## 4. アーキテクチャ概要
 
-- フロント：React（Vite）  
-- ブリッジ：Tauri（Rustコマンド）  
-- バック：ローカルFS／Ollama HTTP（`http://localhost:11434`）  
-- 永続化：`app_data_dir()/workspace.json`（取得不可時はカレント）  
+- フロント：React（Vite） + TypeScript（JSDOMテストは Vitest）
+- ブリッジ：Tauri 2（Rustコマンド／`src/main.rs` で `tauri::Builder` を構成）
+- バック：ローカルFS／Ollama HTTP（`http://localhost:11434`）
+- 永続化：`app_data_dir()/workspace.json`（取得不可時はカレント）
 - ログ：`runs/<YYYYMMDD-HHMMSS>/`
 
 ---
@@ -54,21 +54,28 @@
 ```text
 data/
   fragments/ ... YAML（合成テンプレの分割片）
-  profiles/  ... モデル設定（参考）
+  profiles/  ... モデル設定プリセット
   recipes/   ... 合成レシピ（どのフラグメントを順に連結するか）
 
-prompts/       # すべてのプロンプト（System含む）をここに保存（拡張時に活用）
-corpus/        # 簡易RAG対象の .txt
+prompts/       # すべてのプロンプト（System含む）を保存（初回起動時に作成）
+corpus/        # 簡易RAG対象の .txt（初回利用で作成）
 project/       # 編集対象の .py/.txt/.md/.json（サンドボックス）
 
-runs/<ts>/     # 実行ログ（自動生成）
-src/           # React/TypeScript と Rust（Tauriランタイム）が同居
-  main.rs      # Rustエントリポイント（tauri::Builder を構成）
-  lib.rs       # Rustコマンド実装（compose/run/IO/Workspace）
+runs/<ts>/     # 実行ログ（ストリーミング含む記録）
+src/
+  main.rs           # Tauri 2 エントリポイント（Rust側コマンド登録）
+  lib.rs            # Rustコマンド実装（compose/run/IO/Workspace）
   ollama_stream.rs  # ストリーミング送信と中断制御
-  main.tsx     # Reactエントリポイント
-  App.tsx      # 2ペインUIとTopToolbar
-  security/    # allowlist などの設定モジュール
+  setup_check.rs    # Ollama疎通チェック
+  txt_excerpt.rs    # TXT抜粋処理
+  tests.rs          # Rust側ユーティリティテスト
+  main.tsx          # Reactエントリポイント
+  App.tsx           # 2ペインUIとツールバー
+  KeybindOverlay.tsx # ショートカットオーバーレイ
+  useOllamaStream.ts # ストリーミングhooks
+  useSetupCheck.ts  # 起動時のセットアップ確認
+  security/         # allowlist などの設定モジュール
+  app.css           # 共通スタイル
 scripts/*.bat  # Windows 起動/ビルド補助
 ```
 
@@ -158,6 +165,7 @@ type Workspace = {
 ```
 
 > v1 → v2 マイグレーションは起動時に自動実行し、既存ワークスペースを単一タブとして取り込む計画。
+> Workspace v2 ロードマップと整合させ、タブ永続化・色プリセットを段階的に開放する。
 
 ### 7.3 実行ログ（`runs/<ts>/`）
 
@@ -378,9 +386,15 @@ type Workspace = {
 - `scripts/dev.bat`：開発起動（Vite + Tauri）
 - `scripts/build.bat`：NSISインストーラ作成（`target/release/bundle`）
 - `scripts/run-built.bat`：生成EXEを検索して起動
-- `scripts/check-ollama.bat`：`/api/tags` で疎通確認  
+- `scripts/check-ollama.bat`：`/api/tags` で疎通確認
 
 > 依存：Node.js、Rust（stable）、Ollama（対象モデルは事前pull）
+
+### 13.1 開発時の標準チェック
+
+- `npm run lint`：React/TypeScript の ESLint（Workspace v2 以降も継続）
+- `npm test`：Vitest（JSDOM）
+- `npm run tauri:dev`：Tauri 2 デバッグ（Rustコマンドの変更時）
 
 ---
 
