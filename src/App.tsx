@@ -238,16 +238,7 @@ export default function App() {
       setRunning(false)
       setOllamaError(describeOllamaError(message))
       clearStreamedResponse()
-    },
-    [clearStreamedResponse, setOllamaError]
-  )
-
-  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
-    onChunk: appendStreamChunk,
-    onEnd: () => {
-      void handleStreamEnd()
-    },
-    onError: handleStreamError
+    }
   })
   const abortStream = useCallback(async () => {
     resetOllamaError()
@@ -445,7 +436,14 @@ export default function App() {
     [sendSelectionOnly, leftSelection, leftText, leftSelectionStart, leftSelectionEnd]
   )
   const sanitization = useMemo(() => sanitizeUserInput(rawUserInput), [rawUserInput])
-  const sanitizedPreview = sanitization.overLimit ? rawUserInput : sanitization.sanitized
+  const sanitizedPreview = useMemo(() => {
+    const base = sanitization.sanitized
+    if (!sanitization.overLimit) {
+      return base
+    }
+    const MAX_PREVIEW_LENGTH = 40000
+    return base.length > MAX_PREVIEW_LENGTH ? base.slice(0, MAX_PREVIEW_LENGTH) : base
+  }, [sanitization])
   const [userInputWarnings, setUserInputWarnings] = useState<{ maskedTypes: string[]; overLimit: boolean }>(() => ({
     maskedTypes: sanitization.maskedTypes,
     overLimit: sanitization.overLimit
