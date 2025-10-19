@@ -166,7 +166,8 @@ tools/          # 補助スクリプト群
 ## 🗺️ ロードマップ（抜粋）
 
 - **v1.0**（本リリース）: 2ペイン/合成/Ollama/Project I-O/Workspace/ログ/テーマ
-- **v0.4系**（計画）: Workspace v2、タブ永続化、差分プレビュー、CI/Docs整備
+- **v0.4.2**（整備フェーズ準備中）: CIパイプライン拡張、Issueテンプレ更新、Docs整備、Diagnostics、Export/Import
+- **v0.4.1**（進行中）: Workspace v2、タブ永続化、差分プレビュー、機密マスク、サイズ上限、workspace.bak
 - **完了済み**（v0.4.0）: 選択送信
 
 ---
