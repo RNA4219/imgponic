@@ -14,8 +14,8 @@
 | 対象 | 上流 | ref | 最新コミット | 対応 WebKit | MSRV | Linux 必須 feature / 備考 |
 | ---- | ---- | --- | ------------ | ----------- | ---- | -------------------------- |
 | tauri | (該当候補未確認) | – | – | – | – | Issue [#12563](https://github.com/tauri-apps/tauri/issues/12563) で移行作業募集中（`gtk4` feature 未提供）。 |
-| wry | [conradhale/wry](https://github.com/conradhale/wry) | `dev` | `fdce27aca03b79682cb7779483bd69d25f0134c6` | `webkit6` crate v0.4（`v2_42` feature, WebKitGTK 6.0 系）【8f3bfc†L1-L64】 | 1.77（現行 dev と同一）【8f3bfc†L6-L18】 | デフォルトの `os-webview` で `soup3` / `webkit6` / `gtk4` を同時有効化。【8f3bfc†L25-L43】 |
-| tao | [conradhale/tao](https://github.com/conradhale/tao) | `dev` | `0fa97b7e3288bdda4b1a43a58117cdb154206d68` | –（WebKit 非依存） | 1.74（現行 dev と同一）【c27b59†L1-L40】 | Linux 依存は `gtk4` / `gdk4-x11` / `gdk4-wayland` を明示リンク。【c27b59†L67-L82】 |
+| wry | [conradhale/wry](https://github.com/conradhale/wry) | `dev` | `fdce27aca03b79682cb7779483bd69d25f0134c6` | `webkit6` crate v0.4（`features = ["v2_42"]` → WebKitGTK ≥ 2.42）【72b118†L18-L38】 | 1.77（現行 dev と同一）【72b118†L6-L17】 | Linux 向けに `gtk4 0.9` / `glib 0.20.9` を採用し、デフォルトの `os-webview` で GTK4 スタックを有効化。`dev-dependencies` が `tao 0.32` へ固定されているため `glib 0.18.5` もロックファイルに残存。|
+| tao | [conradhale/tao](https://github.com/conradhale/tao) | `dev` | `0fa97b7e3288bdda4b1a43a58117cdb154206d68` | –（WebView 非依存） | 1.74（現行 dev と同一）【c27b59†L1-L40】 | Linux 依存は `gtk4` / `gdk4-*` 0.9 系と `glib 0.20.9` に更新。feature `x11` が削除され既定では X11/Wayland 両対応。|
 
 ## Cargo.toml 差分メモ
 
@@ -55,7 +55,7 @@
 # Tauri GTK4 アップグレード検証ログ
 
 ## 2025-10-19 試行メモ
-- `cargo test --test glib_stack --features security` を実行すると `glib-sys v0.18.1` がシステムの `glib-2.0` を要求してビルドスクリプトで失敗（GTK3 ランタイム未導入が原因）。【7be280†L1-L29】
+- `cargo test --test glib_stack --features security` を実行すると `glib-sys v0.18.1` がシステムの `glib-2.0` を要求してビルドスクリプトで失敗（GTK3 ランタイム未導入が原因）。【7be280†L1-L29】【c3427b†L1-L30】
 - `cargo deny check bans` を実行し、`tauri` 2.8.5 由来の `glib = 0.18.5` が ban 設定に抵触することを確認。
 - 現時点で `glib` 0.20 系へ更新された `tauri`/`wry`/`tao` ブランチは未公開のため、`deny.toml` のしきい値を `< 0.18.5` に緩和。
 - **Next action:** 上流で GTK4/GLib ≥0.20 へ移行済みのリリース（または互換パッチ）が出次第、`deny.toml` を再更新し `glib` 0.20 以上を再要求する。
