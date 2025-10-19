@@ -77,18 +77,18 @@ def test_rust_job_uploads_cargo_test_log() -> None:
     assert "path: artifacts/cargo-test.log\n" in upload_body
 
 
-def test_rust_job_installs_gtk3_stack() -> None:
+def test_rust_job_installs_gtk4_stack() -> None:
     workflow_path = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "rust.yml"
     workflow_text = workflow_path.read_text(encoding="utf-8")
 
     assert "- name: Install GTK dependencies\n" in workflow_text
-    assert "libgtk-3-dev" in workflow_text
-    assert "libwebkit2gtk-4.1-dev" in workflow_text
+    assert "libgtk-4-dev" in workflow_text
+    assert "libwebkitgtk-6.0-dev" in workflow_text
 
 
-def test_assert_gtk_stack_accepts_gtk3() -> None:
+def test_assert_gtk_stack_accepts_gtk4() -> None:
     script = Path(__file__).resolve().parent.parent / "tools" / "ci" / "assert-gtk-stack.sh"
     script_text = script.read_text(encoding="utf-8")
 
-    assert "pkg-config --exists gtk+-3.0" in script_text
-    assert "gtk+-3.0 should not be present" not in script_text
+    assert "pkg-config --exists gtk4" in script_text
+    assert "pkg-config --exists webkitgtk-6.0" in script_text
