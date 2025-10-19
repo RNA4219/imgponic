@@ -262,7 +262,7 @@ async fn run_ollama_stream_impl(
     let task = async move {
         let mut finished = false;
         let mut buffer = String::new();
-        let mut jsonl_accumulator = String::new();
+        let mut raw_jsonl_lines: Vec<String> = Vec::new();
         let send_result: Result<(), String> = async {
             let client = reqwest::Client::new();
             let response = client
@@ -279,7 +279,7 @@ async fn run_ollama_stream_impl(
                 }
                 match parse_ollama_jsonl_line(&raw) {
                     Ok(parsed) => {
-                        jsonl_accumulator.push_str(&parsed.raw);
+                        raw_jsonl_lines.push(parsed.raw.clone());
                         let mut done_triggered = false;
                         let mut errored = false;
                         let line_finished = emit_events_for_line(
@@ -300,7 +300,7 @@ async fn run_ollama_stream_impl(
                         );
                         if done_triggered {
                             finished = true;
-                            let aggregated = jsonl_accumulator.clone();
+                            let aggregated = raw_jsonl_lines.join("");
                             let _ = window_for_task.emit("ollama:end", aggregated);
                         } else if errored || line_finished {
                             finished = true;
