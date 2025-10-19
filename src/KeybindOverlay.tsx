@@ -12,11 +12,16 @@ export const resolveKeybindOverlayState = (current: boolean, event: KeyboardLike
 
 export type KeybindShortcut = { keys: string; description: string }
 
+const FOCUS_MODE_SHORTCUT: KeybindShortcut = {
+  keys: 'Ctrl/Cmd+Shift+F',
+  description: 'フォーカスモードを切り替え（片側全画面⇔2ペイン）'
+}
+
 export const KEYBIND_SHORTCUTS: KeybindShortcut[] = [
   { keys: 'Ctrl/Cmd+Enter', description: 'LLM実行（左入力を整形）' },
   { keys: 'Ctrl/Cmd+S', description: '左ペインのテキストを project/ に保存' },
   { keys: 'Ctrl/Cmd+C', description: '右ペインの生成結果をコピー' },
-  { keys: 'Ctrl/Cmd+Shift+F', description: 'フォーカスモードを切り替え（片側全画面⇔2ペイン）' },
+  FOCUS_MODE_SHORTCUT,
   { keys: '? / Esc', description: 'ショートカット早見表の表示／閉じる' }
 ]
 
