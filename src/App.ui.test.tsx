@@ -1796,7 +1796,7 @@ domTest('aggregates raw jsonl lines before invoking save_run', async () => {
         startStream: async () => {},
         abortStream: async () => {},
         appendChunk: chunk => handlers?.onChunk?.(chunk),
-        isStreaming: true
+        isStreaming: false
       }
     }
   }
@@ -1812,7 +1812,7 @@ domTest('aggregates raw jsonl lines before invoking save_run', async () => {
     await act(async () => { runButton.click(); await Promise.resolve() })
     expect(saveRunCalls).toHaveLength(0)
 
-    const aggregated = '{"response":"alpha"}\n{"response":"beta","done":true}'
+    const aggregated = '{"response":"alpha"}\n{"response":"beta","done":true}\n'
     expect(saveRunCalls).toHaveLength(0)
 
     await act(async () => {

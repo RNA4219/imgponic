@@ -273,31 +273,23 @@ async fn run_ollama_stream(
                 }
                 match parse_ollama_jsonl_line(&raw) {
                     Ok(parsed) => {
-                        let ParsedOllamaLine {
-                            raw: parsed_raw,
-                            events,
-                        } = parsed;
-                        let emit_payload = parsed_raw.clone();
-                        _raw_lines.push(parsed_raw);
-                        let _ = window_for_task.emit("ollama:jsonl", emit_payload);
-                        for event in events {
-                            match event {
-                                OllamaEvent::Chunk(text) => {
-                                    let _ = window_for_task.emit("ollama:chunk", text);
-                                }
-                                OllamaEvent::Done => {
-                                    finished = true;
-                                    let _ = window_for_task.emit("ollama:end", ());
-                                }
-                                OllamaEvent::Error(msg) => {
-                                    finished = true;
-                                    let _ = window_for_task.emit("ollama:error", msg);
-                                }
-                            }
-                            if finished {
-                                break;
-                            }
-                        }
+                        emit_events_for_line(
+                            parsed,
+                            |jsonl| {
+                                let _ = window_for_task.emit("ollama:jsonl", jsonl);
+                            },
+                            |chunk| {
+                                let _ = window_for_task.emit("ollama:chunk", chunk);
+                            },
+                            || {
+                                finished = true;
+                                let _ = window_for_task.emit("ollama:end", ());
+                            },
+                            |msg| {
+                                finished = true;
+                                let _ = window_for_task.emit("ollama:error", msg);
+                            },
+                        );
                         Ok(())
                     }
                     Err(err) => Err(err.to_string()),

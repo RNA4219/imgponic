@@ -59,6 +59,65 @@ describe('useOllamaStream (jsonl aggregation)', () => {
     vi.resetAllMocks()
   })
 
+  it('subscribes to JSONL lines and accumulates them until completion', async () => {
+    const listeners = new Map<string, (payload: HandlerPayload) => void>()
+    let resolveStream: (() => void) | null = null
+
+    vi.mocked(getCurrentWindow).mockReturnValue({
+      listen: vi.fn(async (event: string, handler: (payload: HandlerPayload) => void) => {
+        listeners.set(event, handler)
+        return () => {
+          listeners.delete(event)
+        }
+      })
+    } as unknown as ReturnType<typeof getCurrentWindow>)
+
+    vi.mocked(invoke).mockImplementation(async command => {
+      if (command === 'run_ollama_stream') {
+        await new Promise<void>(resolve => {
+          resolveStream = resolve
+        })
+      }
+      return undefined
+    })
+
+    const onChunk = vi.fn()
+    const onJsonl = vi.fn()
+    const onEnd = vi.fn()
+    const { result, unmount } = mountHook({ onChunk, onJsonl, onEnd })
+    const startPromise = result.current?.startStream({ model: 'm', systemText: 's', userText: 'u' }) ?? Promise.resolve()
+    await flushEffects()
+
+    expect(Array.from(listeners.keys())).toEqual([
+      'ollama:chunk',
+      'ollama:jsonl',
+      'ollama:end',
+      'ollama:error'
+    ])
+
+    listeners.get('ollama:chunk')?.({ payload: 'alpha ' })
+    listeners.get('ollama:jsonl')?.({ payload: '{"response":"alpha ","done":false}\n' })
+    listeners.get('ollama:chunk')?.({ payload: 'beta' })
+    listeners.get('ollama:jsonl')?.({ payload: '{"response":"beta","done":true}\n' })
+
+    await act(async () => {
+      listeners.get('ollama:end')?.({})
+      resolveStream?.()
+      await startPromise
+    })
+
+    expect(onChunk.mock.calls.map(args => args[0])).toEqual(['alpha ', 'beta'])
+    expect(onJsonl.mock.calls.map(args => args[0])).toEqual([
+      '{"response":"alpha ","done":false}\n',
+      '{"response":"beta","done":true}\n'
+    ])
+    expect(onEnd).toHaveBeenCalledWith({
+      raw: '{"response":"alpha ","done":false}\n{"response":"beta","done":true}\n'
+    })
+
+    unmount()
+  })
+
   it('aggregates JSONL payloads and forwards them to onEnd', async () => {
     const listeners = new Map<string, (payload: HandlerPayload) => void>()
     let resolveStream: (() => void) | null = null
