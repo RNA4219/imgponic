@@ -2,8 +2,8 @@
 
 [[bans.deny]]
 name = "glib"
-version = "< 0.20.0"
-reason = "GTK4 互換のため glib 0.20 以上を要求"
+version = "< 0.18.5"
+reason = "Tauri 2.x では glib 0.18.5 が最新依存。これ未満を禁止しつつ 0.20 以降移行は docs で追跡"
 
 [[bans.deny]]
 name = "gtk"
