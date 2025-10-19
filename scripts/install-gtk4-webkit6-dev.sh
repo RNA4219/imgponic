@@ -73,9 +73,8 @@ elif command -v pacman >/dev/null 2>&1; then
   pacman_common=(
     glib2
     gtk4
-    # Arch では libsoup-3.0.pc を提供する libsoup3 パッケージが必要。
+    # pkg-config の libsoup-3.0 チェックを満たすため libsoup3 を導入する。
     libsoup3
-    libsoup3 # pkg-config で libsoup-3.0 を要求するため 3.x 系を明示
     gdk-pixbuf2
     pango
     cairo
