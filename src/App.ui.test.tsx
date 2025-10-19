@@ -460,6 +460,79 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
   }
 })
 
+domTest('masks over-limit preview with sanitized text', async () => {
+  const secret = 'ABCDEFGHIJKLMNOPQRSTUVWX0123456789'
+  const payload = `${'x'.repeat(40020)}\napi_key = "${secret}"\n`
+
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({
+      status: 'ready',
+      guidance: '',
+      retry: vi.fn(async () => {})
+    }),
+    useOllamaStream: () => ({
+      startStream: async () => {},
+      abortStream: async () => {},
+      appendChunk: () => {},
+      isStreaming: false
+    }),
+    invoke: async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') {
+        return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  try {
+    await act(async () => {
+      root.render(<App />)
+    })
+
+    const leftTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="left"]'),
+      'left textarea'
+    )
+    if (!(leftTextarea instanceof HTMLTextAreaElement)) {
+      throw new Error('Expected left textarea')
+    }
+
+    await act(async () => {
+      leftTextarea.value = payload
+      leftTextarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await flushEffects()
+
+    const previewDetails = container.querySelector('details')
+    expect(previewDetails).toBeInstanceOf(HTMLElement)
+    if (!(previewDetails instanceof HTMLElement)) {
+      throw new Error('Expected preview details')
+    }
+    previewDetails.setAttribute('open', '')
+
+    await flushEffects()
+
+    const previewPre = previewDetails.querySelector('pre')
+    expect(previewPre).toBeInstanceOf(HTMLElement)
+    const previewText = previewPre?.textContent ?? ''
+
+    expect(previewText).toContain('<REDACTED:API_KEY>')
+    expect(previewText).not.toContain(secret)
+  } finally {
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  }
+})
+
 domTest('aborting stream resets ollama error and calls abort once', async () => {
   const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
   const rawAbortStream = vi.fn(async () => {})

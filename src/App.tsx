@@ -230,25 +230,19 @@ export default function App() {
     setRightText('')
   }, [])
 
-  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
-    onChunk: chunk => setRightText(prev => prev + chunk),
-    onEnd: () => setRunning(false),
-    onError: message => {
-      console.error('ollama stream error', message)
-      setRunning(false)
-      setOllamaError(describeOllamaError(message))
-      clearStreamedResponse()
+  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook(
+    {
+      onChunk: chunk => setRightText(prev => prev + chunk),
+      onEnd: () => setRunning(false),
+      onError: message => {
+        console.error('ollama stream error', message)
+        setRunning(false)
+        setOllamaError(describeOllamaError(message))
+        clearStreamedResponse()
+      }
     },
     [clearStreamedResponse, setOllamaError]
   )
-
-  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
-    onChunk: appendStreamChunk,
-    onEnd: () => {
-      void handleStreamEnd()
-    },
-    onError: handleStreamError
-  })
   const abortStream = useCallback(async () => {
     resetOllamaError()
     setRunning(false)
@@ -445,7 +439,14 @@ export default function App() {
     [sendSelectionOnly, leftSelection, leftText, leftSelectionStart, leftSelectionEnd]
   )
   const sanitization = useMemo(() => sanitizeUserInput(rawUserInput), [rawUserInput])
-  const sanitizedPreview = sanitization.overLimit ? rawUserInput : sanitization.sanitized
+  const sanitizedPreview = useMemo(() => {
+    const base = sanitization.sanitized
+    if (!base) {
+      return ''
+    }
+    const SAFE_PREVIEW_LENGTH = 40000
+    return base.length > SAFE_PREVIEW_LENGTH ? `${base.slice(0, SAFE_PREVIEW_LENGTH)}…` : base
+  }, [sanitization.sanitized])
   const [userInputWarnings, setUserInputWarnings] = useState<{ maskedTypes: string[]; overLimit: boolean }>(() => ({
     maskedTypes: sanitization.maskedTypes,
     overLimit: sanitization.overLimit
