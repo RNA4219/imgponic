@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::{Emitter, Manager};
 
-use crate::ollama_stream::{parse_ollama_jsonl_line, OllamaEvent, ParsedOllamaLine, StreamState};
+use crate::ollama_stream::{emit_events_for_line, parse_ollama_jsonl_line, StreamState};
 use crate::setup_check::check_ollama_setup;
 
 #[derive(Debug, Deserialize)]
@@ -257,7 +257,6 @@ async fn run_ollama_stream(
     let task = async move {
         let mut finished = false;
         let mut buffer = String::new();
-        let mut _raw_lines: Vec<String> = Vec::new();
         let send_result: Result<(), String> = async {
             let client = reqwest::Client::new();
             let response = client
@@ -274,27 +273,25 @@ async fn run_ollama_stream(
                 }
                 match parse_ollama_jsonl_line(&raw) {
                     Ok(parsed) => {
-                        let ParsedOllamaLine { raw: parsed_raw, events } = parsed;
-                        let emit_payload = parsed_raw.clone();
-                        _raw_lines.push(parsed_raw);
-                        let _ = window_for_task.emit("ollama:jsonl", emit_payload);
-                        for event in events {
-                            match event {
-                                OllamaEvent::Chunk(text) => {
-                                    let _ = window_for_task.emit("ollama:chunk", text);
-                                }
-                                OllamaEvent::Done => {
-                                    finished = true;
-                                    let _ = window_for_task.emit("ollama:end", ());
-                                }
-                                OllamaEvent::Error(msg) => {
-                                    finished = true;
-                                    let _ = window_for_task.emit("ollama:error", msg);
-                                }
-                            }
-                            if finished {
-                                break;
-                            }
+                        let ended = emit_events_for_line(
+                            parsed,
+                            |payload| {
+                                let _ = window_for_task.emit("ollama:jsonl", payload);
+                            },
+                            |text| {
+                                let _ = window_for_task.emit("ollama:chunk", text);
+                            },
+                            || {
+                                finished = true;
+                                let _ = window_for_task.emit("ollama:end", ());
+                            },
+                            |msg| {
+                                finished = true;
+                                let _ = window_for_task.emit("ollama:error", msg);
+                            },
+                        );
+                        if ended {
+                            finished = true;
                         }
                         Ok(())
                     }
