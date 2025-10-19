@@ -73,7 +73,8 @@ elif command -v pacman >/dev/null 2>&1; then
   pacman_common=(
     glib2
     gtk4
-    libsoup
+    # pkg-config の libsoup-3.0 チェックを満たすため libsoup3 を導入する。
+    libsoup3
     gdk-pixbuf2
     pango
     cairo
