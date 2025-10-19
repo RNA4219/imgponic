@@ -94,3 +94,6 @@ package `promptforge` depends on `tauri` with feature `gtk4` but `tauri` does no
 
 failed to select a version for `tauri` which could resolve this conflict
 ```
+
+## 2025-10-19 `cargo fmt --all` 実行ログ
+- 結果: 成功（差分なし）
