@@ -313,6 +313,91 @@ domTest('renders setup guidance banner when offline and retries on demand', asyn
   container.remove()
 })
 
+domTest('uses ollama stream hook contract for run and stop controls', async () => {
+  const startStream = vi.fn(async () => {})
+  const abortStream = vi.fn(async () => {})
+  const appendChunk = vi.fn()
+  const useOllamaStreamMock = vi.fn(() => ({
+    startStream,
+    abortStream,
+    appendChunk,
+    isStreaming: false
+  }))
+
+  const invokeMock = vi.fn(async (cmd: string, args?: Record<string, unknown>) => {
+    if (cmd === 'read_workspace') return null
+    if (cmd === 'write_workspace') return 'ok'
+    if (cmd === 'list_project_files') return []
+    if (cmd === 'compose_prompt') {
+      void args
+      return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+    }
+    if (cmd === 'run_ollama_stream') return undefined
+    if (cmd === 'save_run') return undefined
+    return undefined
+  })
+
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({
+      status: 'ready',
+      guidance: '',
+      retry: vi.fn(async () => {})
+    }),
+    useOllamaStream: useOllamaStreamMock,
+    invoke: invokeMock
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  try {
+    await act(async () => {
+      root.render(<App />)
+    })
+
+    expect(useOllamaStreamMock).toHaveBeenCalledTimes(1)
+
+    const runButton = await waitForElement(
+      () =>
+        Array.from(container.querySelectorAll('button')).find(button =>
+          button.textContent?.includes('▶ 実行')
+        ) ?? null,
+      'run button'
+    )
+
+    await act(async () => {
+      runButton.click()
+      await Promise.resolve()
+    })
+
+    expect(startStream).toHaveBeenCalledTimes(1)
+    expect(startStream.mock.calls[0]?.[0]).toMatchObject({ model: 'llama3:8b' })
+
+    const stopButton = await waitForElement(
+      () =>
+        Array.from(container.querySelectorAll('button')).find(button => button.textContent === '停止') ??
+        null,
+      'stop button'
+    )
+
+    const stopProps = stopButton ? getReactProps(stopButton) : null
+
+    await act(async () => {
+      const handler = stopProps?.onClick as
+        | ((event: React.MouseEvent<HTMLButtonElement>) => unknown)
+        | undefined
+      await handler?.({ preventDefault() {} } as React.MouseEvent<HTMLButtonElement>)
+    })
+
+    expect(abortStream).toHaveBeenCalledTimes(1)
+  } finally {
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  }
+})
+
 domTest('Ctrl/Cmd+Shift+F toggles focus mode and reset button restores layout', async () => {
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({
