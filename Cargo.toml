@@ -10,10 +10,6 @@ gtk4 = [
     "dep:tauri-plugin-fs",
     "dep:tauri-plugin-dialog",
     "dep:tauri-plugin-clipboard-manager",
-    "tauri/gtk4",
-    "tauri-plugin-fs/native",
-    "tauri-plugin-dialog/native",
-    "tauri-plugin-clipboard-manager/native",
 ]
 # 互換レイヤー追加時の集約用エイリアス。新規レイヤーは gtk4 へ統合すること。
 gtk4_compat = ["gtk4"]
