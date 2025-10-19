@@ -15,7 +15,7 @@ gtk4 = [
     "tauri-plugin-dialog/native",
     "tauri-plugin-clipboard-manager/native",
 ]
-# 将来の互換レイヤーを追加する際のエイリアス
+# 互換レイヤー追加時の集約用エイリアス。新規レイヤーは gtk4 へ統合すること。
 gtk4_compat = ["gtk4"]
 
 [dependencies]
