@@ -265,10 +265,16 @@ export default function App() {
         setRunning(false)
         setOllamaError(describeOllamaError(message))
         clearStreamedResponse()
+        hasSavedRunRef.current = true
       }
     },
-    [clearStreamedResponse, invokeFn, recipePath]
-  )
+    onError: message => {
+      console.error('ollama stream error', message)
+      setRunning(false)
+      setOllamaError(describeOllamaError(message))
+      clearStreamedResponse()
+    }
+  })
   const abortStream = useCallback(async () => {
     resetOllamaError()
     setRunning(false)
