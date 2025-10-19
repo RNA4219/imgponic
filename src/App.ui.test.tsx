@@ -712,6 +712,89 @@ domTest('aborting stream resets ollama error and calls abort once', async () => 
   }
 })
 
+domTest('redacts over-limit secrets in preview and compose invocation', async () => {
+  const secret = 'AKIA1234567890ABCDEF'
+  const filler = 'x'.repeat(40000)
+  const composeCalls: string[] = []
+  const startStreamImpl = vi.fn(async () => {})
+
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({
+      status: 'ready',
+      guidance: '',
+      retry: vi.fn(async () => {})
+    }),
+    useOllamaStream: handlers => ({
+      startStream: async args => {
+        await startStreamImpl(args)
+        handlers?.onEnd?.()
+      },
+      abortStream: async () => {},
+      appendChunk: chunk => handlers?.onChunk?.(chunk),
+      isStreaming: false
+    }),
+    invoke: async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') {
+        const inline = (args?.inlineParams ?? {}) as { user_input?: string }
+        composeCalls.push(String(inline.user_input ?? ''))
+        return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'model' }
+      }
+      return undefined
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  try {
+    await act(async () => {
+      root.render(<App />)
+    })
+
+    const leftTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="left"]') as HTMLTextAreaElement | null,
+      'left textarea'
+    )
+
+    const longText = `${filler}${secret}`
+
+    await act(async () => {
+      leftTextarea.value = longText
+      leftTextarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await flushEffects()
+
+    const preview = container.querySelector('details pre')
+    expect(preview).toBeInstanceOf(HTMLElement)
+    if (!(preview instanceof HTMLElement)) throw new Error('Expected preview element')
+    const previewText = preview.textContent ?? ''
+    expect(previewText).toContain('<REDACTED:AWS_ACCESS_KEY>')
+    expect(previewText).not.toContain(secret)
+
+    const runButton = container.querySelector('.runpulse')
+    expect(runButton).toBeInstanceOf(HTMLButtonElement)
+    if (!(runButton instanceof HTMLButtonElement)) throw new Error('Expected run button')
+
+    await act(async () => {
+      runButton.click()
+    })
+    await flushEffects()
+
+    expect(startStreamImpl).toHaveBeenCalledTimes(1)
+    expect(composeCalls).toHaveLength(1)
+    expect(composeCalls[0]).toContain('<REDACTED:AWS_ACCESS_KEY>')
+    expect(composeCalls[0]).not.toContain(secret)
+  } finally {
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  }
+})
+
 test('determineUserInput returns selection context with line range header', () => {
   const leftText = Array.from({ length: 12 }, (_, idx) => `line-${idx + 1}`).join('\n')
   const selection = 'line-6'
