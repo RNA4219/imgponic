@@ -13,10 +13,17 @@ fi
 if command -v apt-get >/dev/null 2>&1; then
   DEBIAN_FRONTEND=noninteractive "${SUDO[@]}" apt-get update
   DEBIAN_FRONTEND=noninteractive "${SUDO[@]}" apt-get install -y \
-    build-essential pkg-config cmake \
-    libglib2.0-dev libgtk-4-dev \
-    libwebkitgtk-6.0-dev libjavascriptcoregtk-6.0-dev \
-    libsoup-3.0-dev libgdk-pixbuf-2.0-dev libpango1.0-dev libcairo2-dev
+    build-essential \
+    pkg-config \
+    cmake \
+    libglib2.0-dev \
+    libgtk-4-dev \
+    libwebkitgtk-6.0-dev \
+    libjavascriptcoregtk-6.0-dev \
+    libsoup-3.0-dev \
+    libgdk-pixbuf-2.0-dev \
+    libpango1.0-dev \
+    libcairo2-dev
 elif command -v dnf >/dev/null 2>&1; then
   "${SUDO[@]}" dnf groupinstall -y "Development Tools"
   "${SUDO[@]}" dnf install -y \
