@@ -80,11 +80,14 @@ elif command -v pacman >/dev/null 2>&1; then
   )
 
   if pacman -Si webkitgtk-6.0 >/dev/null 2>&1; then
+    # Arch 系の webkitgtk-6.0 パッケージに javascriptcoregtk-6.0.pc も含まれるため、
+    # WEBKIT_PKG_CONFIG で javascriptcoregtk-6.0 の存在を引き続き検証する。
     WEBKIT_PKG_CONFIG=(webkitgtk-6.0 javascriptcoregtk-6.0)
-    pacman_webkit=(webkitgtk-6.0 javascriptcoregtk-6.0)
+    pacman_webkit=(webkitgtk-6.0)
   else
+    # webkit2gtk-4.1 パッケージも同様に javascriptcoregtk-4.1.pc を提供する。
     WEBKIT_PKG_CONFIG=(webkit2gtk-4.1 javascriptcoregtk-4.1)
-    pacman_webkit=(webkit2gtk-4.1 javascriptcoregtk-4.1)
+    pacman_webkit=(webkit2gtk-4.1)
   fi
 
   "${SUDO[@]}" pacman -S --needed --noconfirm "${pacman_common[@]}" "${pacman_webkit[@]}"
