@@ -344,4 +344,18 @@ mod ollama_stream_integration {
         );
         assert_eq!(aggregated, format!("{}{}", expected_first, expected_second));
     }
+
+    #[tokio::test]
+    async fn run_ollama_stream_emits_jsonl_lines_without_trailing_newline() {
+        let expected_first = "{\"response\":\"alpha \",\"done\":false}\n".to_string();
+        let expected_second = "{\"done\":true}".to_string();
+        let (jsonl_lines, aggregated) =
+            collect_stream(vec![expected_first.clone(), expected_second.clone()], 2).await;
+
+        assert_eq!(
+            jsonl_lines,
+            vec![expected_first.clone(), expected_second.clone()]
+        );
+        assert_eq!(aggregated, format!("{}{}", expected_first, expected_second));
+    }
 }
