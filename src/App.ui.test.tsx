@@ -1508,8 +1508,14 @@ domTest('defers save_run until stream completion without duplicate start', async
 
     await act(async () => { resolveStream?.(); await capturedHandlers?.onEnd?.() })
     await flushEffects()
-    expect(startCalls).toBe(1); expect(saveRunCalls).toHaveLength(1)
-    const saveArgs = saveRunCalls[0] as { response_text?: string }; expect(saveArgs.response_text).toBe('alpha beta')
+    expect(startCalls).toBe(1)
+    expect(saveRunCalls).toEqual([
+      {
+        recipePath: 'data/recipes/demo.sora2.yaml',
+        final_prompt: 'SYS\n---\nUSER_INPUT',
+        response_text: 'alpha beta'
+      }
+    ])
     const rightTextarea = container.querySelector('textarea[data-side="right"]')
     expect(rightTextarea).toBeInstanceOf(HTMLTextAreaElement); expect(rightTextarea?.value).toBe('alpha beta')
   } finally {

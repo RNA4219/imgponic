@@ -225,6 +225,7 @@ export default function App() {
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
   const streamedResponseRef = useRef<string>('')
+  const hasSavedRunRef = useRef<boolean>(false)
   const updateLeftText = useCallback((value: string) => {
     setLeftText(value)
     setHasDangerWords(containsDangerWords(value))
@@ -232,13 +233,33 @@ export default function App() {
 
   const clearStreamedResponse = useCallback(() => {
     streamedResponseRef.current = ''
+    hasSavedRunRef.current = false
     setRightText('')
   }, [])
 
   useOllamaStreamHook(
     {
-      onChunk: chunk => setRightText(prev => prev + chunk),
-      onEnd: () => setRunning(false),
+      onChunk: chunk => {
+        streamedResponseRef.current += chunk
+        setRightText(prev => prev + chunk)
+      },
+      onEnd: async () => {
+        setRunning(false)
+        if (hasSavedRunRef.current) return
+        hasSavedRunRef.current = true
+        try {
+          await invokeFn<string>('save_run', {
+            recipePath,
+            final_prompt: composedRef.current?.final_prompt ?? '',
+            response_text: streamedResponseRef.current
+          })
+        } catch (error) {
+          console.error('save_run failed', error)
+          setOllamaError(describeOllamaError(error))
+          clearStreamedResponse()
+          hasSavedRunRef.current = true
+        }
+      },
       onError: message => {
         console.error('ollama stream error', message)
         setRunning(false)
@@ -246,7 +267,7 @@ export default function App() {
         clearStreamedResponse()
       }
     },
-    [clearStreamedResponse]
+    [clearStreamedResponse, invokeFn, recipePath]
   )
   const abortStream = useCallback(async () => {
     resetOllamaError()
