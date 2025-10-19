@@ -13,7 +13,7 @@
     "tauri:build": "tauri build",
     "lint": "eslint src/App.tsx src/useOllamaStream.ts src/useSetupCheck.ts src/useSetupCheck.test.ts",
     "test": "vitest --run --environment jsdom",
-    "test:node": "node --import tsx --test src/App.ui.test.tsx"
+    "test:node": "vitest --run --config vitest.node.config.ts"
   },
   "dependencies": {
     "react": "^18.2.0",
