@@ -11,16 +11,16 @@
 
 ## 候補ブランチ・フォーク一覧
 
-| 対象 | 上流 | ref | 最新コミット | 対応 WebKit | 備考 |
-| ---- | ---- | --- | ------------ | ----------- | ---- |
-| tauri | (該当候補未確認) | – | – | – | Issue [#12563](https://github.com/tauri-apps/tauri/issues/12563) で移行作業募集中。 |
-| wry | [conradhale/wry](https://github.com/conradhale/wry) | `dev` | `fdce27aca03b79682cb7779483bd69d25f0134c6` | `webkit6` crate v0.4 (`v2_42` feature, WebKitGTK 6.0 系) | tauri-apps/wry#1530 の head |
-| tao | [conradhale/tao](https://github.com/conradhale/tao) | `dev` | `0fa97b7e3288bdda4b1a43a58117cdb154206d68` | – (WebKit 非依存) | tauri-apps/tao#1104 の head |
+| 対象 | 上流 | ref | 最新コミット | 対応 WebKit | MSRV | Linux 必須 feature / 備考 |
+| ---- | ---- | --- | ------------ | ----------- | ---- | -------------------------- |
+| tauri | (該当候補未確認) | – | – | – | – | Issue [#12563](https://github.com/tauri-apps/tauri/issues/12563) で移行作業募集中（`gtk4` feature 未提供）。 |
+| wry | [conradhale/wry](https://github.com/conradhale/wry) | `dev` | `fdce27aca03b79682cb7779483bd69d25f0134c6` | `webkit6` crate v0.4（`v2_42` feature, WebKitGTK 6.0 系）【8f3bfc†L1-L64】 | 1.77（現行 dev と同一）【8f3bfc†L6-L18】 | デフォルトの `os-webview` で `soup3` / `webkit6` / `gtk4` を同時有効化。【8f3bfc†L25-L43】 |
+| tao | [conradhale/tao](https://github.com/conradhale/tao) | `dev` | `0fa97b7e3288bdda4b1a43a58117cdb154206d68` | –（WebKit 非依存） | 1.74（現行 dev と同一）【c27b59†L1-L40】 | Linux 依存は `gtk4` / `gdk4-x11` / `gdk4-wayland` を明示リンク。【c27b59†L67-L82】 |
 
 ## Cargo.toml 差分メモ
 
 ### wry (`conradhale/wry@fdce27a`)
-- `rust-version = "1.77"`（現行 dev と同一）
+- `rust-version = "1.77"`（現行 dev と同一）。
 - Linux 用依存関係:
   - `webkit = { package = "webkit6", version = "0.4", features = ["v2_42"] }`
   - `gtk = { package = "gtk4", version = "0.9", features = ["v4_6"] }`
@@ -29,6 +29,8 @@
   - TODO: X11 サポート要件（`gdk4-x11` 等）と feature 再導入の要否を確認する。
 - WebKit GTK 6.0 向けビルドに合わせ `pkg-config` の mapping は済（`tools/pkg-config-webkit.sh`）だが、CI イメージの WebKitGTK ≥ 2.42/GTK4.6 が揃っているか確認が必要。
   - TODO: Linux CI コンテナの WebKitGTK/GTK バージョン要件を洗い出す。
+- lockfile 上は `atk` 系 GTK3 クレートが残存し、`glib` が 0.18.5/0.20.9 の二重取り込みになっている。【a64352†L1-L27】【91d757†L1-L7】
+  - TODO: `webkit6` 由来の GTK3 依存をどの段階で除去できるか調査する。
 
 ### tao (`conradhale/tao@0fa97b7e`)
 - `rust-version = "1.74"`（現行 dev と同一）。
@@ -38,14 +40,25 @@
   - `gdk-wayland = { package = "gdk4-wayland", version = "0.9", features = ["wayland_crate"] }`
   - `dlopen2 = "0.7.0"`（新規）
 - TODO: 既存の `tao` patch（tauri-apps/tao@dev）と比べて X11/Wayland feature 名の違いを精査し、`tauri.conf.json` 等で追加設定が必要か判定する。
+- lockfile は `glib` 0.20.9 のみとなり、GTK3 依存は削除済み。【eade2a†L1-L3】
 
 ### tauri
-- 現時点で GTK4/GLib ≥0.20 対応コードを公開している upstream フォークを確認できず。
+- 現時点で GTK4/GLib ≥0.20 対応コードを公開している upstream フォークを確認できず（`gtk4` feature も未実装）。
 - TODO: Issue [#12563](https://github.com/tauri-apps/tauri/issues/12563) の進捗と関連 PR を継続監視し、公開ブランチ出現時に再調査する。
+
+## 互換性ギャップ整理
+
+- `wry@fdce27a`: crate version が `0.50.5` のままのため、`tauri` が要求する `^0.53.4` に合致せず `[patch]` で差し替え不可。また lockfile に GTK3 系（`atk` など）が残り `glib 0.18.5` が混在する。【8f3bfc†L1-L64】【91d757†L1-L7】【a64352†L1-L27】
+- `tao@0fa97b7e`: crate version `0.32.8` が `tauri` 側要求 `^0.34.4` と乖離し差し替え不可だが、依存は GTK4 系へ完全移行済みで `glib 0.20.9` のみを使用。【c27b59†L1-L82】【eade2a†L1-L3】
+- `tauri`: `gtk4` feature 未提供のため、現状アプリ側で feature を有効化してもビルド不可（Issue [#12563](https://github.com/tauri-apps/tauri/issues/12563)）。【c9d575†L92-L120】
 
 # Tauri GTK4 アップグレード検証ログ
 
 ## 2025-10-19 試行メモ
+- `cargo test --test glib_stack --features security` を実行すると `glib-sys v0.18.1` がシステムの `glib-2.0` を要求してビルドスクリプトで失敗（GTK3 ランタイム未導入が原因）。【7be280†L1-L29】
+- `cargo deny check bans` を実行し、`tauri` 2.8.5 由来の `glib = 0.18.5` が ban 設定に抵触することを確認。
+- 現時点で `glib` 0.20 系へ更新された `tauri`/`wry`/`tao` ブランチは未公開のため、`deny.toml` のしきい値を `< 0.18.5` に緩和。
+- **Next action:** 上流で GTK4/GLib ≥0.20 へ移行済みのリリース（または互換パッチ）が出次第、`deny.toml` を再更新し `glib` 0.20 以上を再要求する。
 - `conradhale/tao` (`rev=0fa97b7e3288bdda4b1a43a58117cdb154206d68`) と `conradhale/wry` (`rev=fdce27aca03b79682cb7779483bd69d25f0134c6`)
   を `[patch.crates-io]` へ設定し `cargo update -p wry` を実行。
 - しかし `tauri` が要求する `tao = "^0.34.4"` / `wry = "^0.53.4"` に対し、該当コミットの crate version は
@@ -124,3 +137,6 @@ package `promptforge` depends on `tauri` with feature `gtk4` but `tauri` does no
 
 failed to select a version for `tauri` which could resolve this conflict
 ```
+
+## 2025-10-19 `cargo fmt --all` 実行ログ
+- 結果: 成功（差分なし）

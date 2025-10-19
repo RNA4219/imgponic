@@ -62,8 +62,13 @@ corpus/        # 簡易RAG対象の .txt
 project/       # 編集対象の .py/.txt/.md/.json（サンドボックス）
 
 runs/<ts>/     # 実行ログ（自動生成）
-src/           # React
-src-tauri/     # Rust (Tauri)
+src/           # React/TypeScript と Rust（Tauriランタイム）が同居
+  main.rs      # Rustエントリポイント（tauri::Builder を構成）
+  lib.rs       # Rustコマンド実装（compose/run/IO/Workspace）
+  ollama_stream.rs  # ストリーミング送信と中断制御
+  main.tsx     # Reactエントリポイント
+  App.tsx      # 2ペインUIとTopToolbar
+  security/    # allowlist などの設定モジュール
 scripts/*.bat  # Windows 起動/ビルド補助
 ```
 
@@ -73,29 +78,35 @@ scripts/*.bat  # Windows 起動/ビルド補助
 
 ### 6.1 画面レイアウト
 
-- **上部ツールバー**  
-  - Recipeパス入力（`data/recipes/*.yaml`）  
-  - Model入力（例：`llama3:8b`）  
-  - Params（`goal/tone/steps` 等の主要キー）  
-  - ▶ 実行ボタン（**Ctrl/Cmd+Enter**）
-- **ファイルバー**（`project/`サンドボックス）  
-  - 相対パス入力（例：`src/example.py`）  
+- **上部ツールバー**
+  - Recipeパス入力（`data/recipes/*.yaml`）
+  - Model入力（例：`llama3:8b`）
+  - Params（`goal/tone/steps` 等の主要キー）
+  - 「選択のみ送る」チェックボックス＋前後行プレビュー（自動で概算トークンと前後3行を提示）
+  - ▶ 実行ボタン（**Ctrl/Cmd+Enter**）とストリーミング状態（送信中インジケータ／**停止**ボタン）
+- **ファイルバー**（`project/`サンドボックス）
+  - 相対パス入力（例：`src/example.py`）
   - 「.py一覧」「← 左に開く」「→ 右に開く」「左を保存」「右を保存」
-- **2ペイン**  
-  - 左：テキスト入力（`textarea`）  
-  - 右：LLM整形出力（`textarea`、**⇧ 反映**で左へコピー）
+- **2ペイン**
+  - 左：テキスト入力（`textarea`）。選択範囲がある場合は送信対象とコンテキストがプレビューされる
+  - 右：LLM整形出力（`textarea`、ストリーミングで逐次追記・**⇧ 反映**で左へコピー）
   - 各ペイン：**コピー**・**保存/別名保存**ボタン
 
 ### 6.2 ショートカット
 
-- **Ctrl/Cmd+Enter**：実行（▶）  
-- **Ctrl/Cmd+S**：`project/`へ左ペイン保存  
+- **Ctrl/Cmd+Enter**：実行（▶）
+- **Ctrl/Cmd+S**：`project/`へ左ペイン保存
 - **Ctrl/Cmd+C**：右ペインをコピー（フォーカス中のペイン優先）
+- **Ctrl/Cmd+Shift+F**：フォーカスモード切り替え（片側全画面⇔2ペイン）
+- **?**：キーバインドオーバーレイ
+- **Esc**：キーバインドオーバーレイを閉じる
 
 ### 6.3 状態/フィードバック
 
-- ▶ 押下時：軽い縮小アニメ（押下感）  
-- 右ペイン更新→**⇧ 反映**で左へ転送  
+- ▶ 押下時：軽い縮小アニメ（押下感）＋ストリーミング開始インジケータ
+- 送信中は進捗がステータスバッジに表示され、**停止**で中断可能
+- 右ペイン更新→**⇧ 反映**で左へ転送
+- 「選択のみ送る」有効時は選択範囲と前後3行の要約（概算トークン含む）をサマリに表示
 - `composed.sha256` をツールバー右に表示（先頭16桁）
 
 ---
@@ -117,10 +128,38 @@ type Workspace = {
 }
 ```
 
-> 保存先：`app_data_dir()/workspace.json`（取得不可時はローカル）  
+> 保存先：`app_data_dir()/workspace.json`（取得不可時はローカル）
 > 保存トリガ：入力変更から**約800msデバウンス**
+> 保存時に `workspace.bak` を同階層に生成（失敗時は警告ログ）
 
-### 7.2 実行ログ（`runs/<ts>/`）
+### 7.2 Workspace v2（計画）
+
+タブUIと永続化を目的に、以下の構造へ移行予定。
+
+```json
+{
+  "version": 2,
+  "tabs": [
+    {
+      "id": "01J...",         // ULID
+      "name": "Sora整形",      // 任意名
+      "color": "#22c55e",     // UIテーマ
+      "left": "...",          // 左ペインテキスト
+      "right": "...",         // 右ペインテキスト
+      "recipe": "data/recipes/demo.sora2.yaml",
+      "model": "llama3:8b",
+      "params": {"goal": "", "tone": "", "steps": 6},
+      "project_path": "src/example.py"
+    }
+  ],
+  "activeTabId": "01J...",
+  "updated_at": "2025-10-18T12:34:56Z"
+}
+```
+
+> v1 → v2 マイグレーションは起動時に自動実行し、既存ワークスペースを単一タブとして取り込む計画。
+
+### 7.3 実行ログ（`runs/<ts>/`）
 
 - `recipe.path.txt`：使用レシピパス  
 - `prompt.final.txt`：最終合成テキスト（`USER_INPUT` を含む）  
@@ -178,6 +217,28 @@ type Workspace = {
 
   - 入力：`recipe_path`（相対）、`inline_params`（`params`マージ）
   - 出力：合成済みプロンプト・SHA-256
+- `run_ollama_stream`（GTK4ビルドで有効）
+  - シグネチャ：
+
+    ```text
+    run_ollama_stream(window: WebviewWindow,
+                      state: State<StreamState>,
+                      model: String,
+                      system_text: String,
+                      user_text: String)
+      -> ()
+    ```
+
+  - API：`POST /api/chat`（`stream=true`）を起動し、`ollama:chunk` / `ollama:jsonl` / `ollama:end` / `ollama:error` イベントをemit
+  - 持続中のストリームは `StreamState` で単一管理し、後続呼び出しで前のハンドルを `abort()`
+- `abort_current_stream`（GTK4ビルドで有効）
+  - シグネチャ：
+
+    ```text
+    abort_current_stream(state: State<StreamState>) -> ()
+    ```
+
+  - 動作中のストリームを即時中断し、UIへ完了イベントを送出
 - `run_ollama_chat`
   - シグネチャ：
 
@@ -188,16 +249,19 @@ type Workspace = {
 
   - API：`POST /api/chat`（`stream=false`）
     `messages=[{ role: 'system' }, { role: 'user' }]`
-  - 出力：OllamaのRAWテキスト
+  - 出力：OllamaのRAWテキスト（互換用のフォールバック）
 - `save_run`
   - シグネチャ：
 
     ```text
-    save_run(recipe_path: String, final_prompt: String, response_text: String)
+    save_run(recipe_path: String,
+             final_prompt: String,
+             response_text: String,
+             response_jsonl?: String)
       -> String
     ```
 
-  - 出力：保存先ディレクトリパス
+  - 出力：保存先ディレクトリパス。ストリーミング時は`response_jsonl`でJSONL履歴を保持
 
 ### 10.2 TXT（簡易RAG）
 
@@ -285,13 +349,16 @@ type Workspace = {
      （左ペインを `user_input` として注入）
   2) 合成結果から `system_text`（区切りより前）と
      `user_text`（区切り以降）を分離
-  3) `run_ollama_chat` → **右ペインに反映**
+  3) `run_ollama_stream`（GTK4）で逐次イベントをemit→ **右ペインに反映**
+     （非GTK4時は `run_ollama_chat` で同等処理を同期実行）
+  4) 完了またはエラー時に `ollama:end` / `ollama:error` を受信し、ストリームを閉じる
 - **⇧ 反映**：右→左コピー
 - **コピー/保存**：各ペイン単位。
   `Ctrl/Cmd+S` は左ペインを `project/` に保存
 - **autosave**：
   入力・モデル・レシピ・パラメータ・`project_path` を800msデバウンスで
   `workspace.json` に書き出し
+- **停止**：`abort_current_stream` コマンドを叩き、現行ストリームを`AbortHandle`で破棄
 
 ---
 
@@ -308,9 +375,9 @@ type Workspace = {
 
 ## 13. ビルド / 起動（Windows）
 
-- `scripts/dev.bat`：開発起動（Vite + Tauri）  
-- `scripts/build.bat`：NSISインストーラ作成（`src-tauri/target/release/bundle`）  
-- `scripts/run-built.bat`：生成EXEを検索して起動  
+- `scripts/dev.bat`：開発起動（Vite + Tauri）
+- `scripts/build.bat`：NSISインストーラ作成（`target/release/bundle`）
+- `scripts/run-built.bat`：生成EXEを検索して起動
 - `scripts/check-ollama.bat`：`/api/tags` で疎通確認  
 
 > 依存：Node.js、Rust（stable）、Ollama（対象モデルは事前pull）
@@ -333,22 +400,20 @@ type Workspace = {
 
 ## 15. 既知の制約 / リスク
 
-- **非ストリーミング**：長文応答は待機時間が出る  
-- **`textarea`ベース**：巨大ファイル編集・差分レビューは不得手  
+- **ストリーミング制限**：同時に1セッションのみ。長文応答はchunk待機が発生
+- **`textarea`ベース**：巨大ファイル編集・差分レビューは不得手
 - **UTF-8前提**：他エンコーディングは未対応（要注意）
 
 ---
 
 ## 16. 近未来拡張（優先順）
 
-1) **ストリーミング**（`stream:true` + 中断ボタン）
-2) **選択範囲だけ送信**＋前後行の自動コンテキスト
-3) **タブUI**（名前/色/並べ替え/永続化）
-4) **差分モード**：右ペインを**Unified Diff**で出力 →
+1) **タブUI**（名前/色/並べ替え/永続化）
+2) **差分モード**：右ペインを**Unified Diff**で出力 →
    Rustで安全適用（失敗ハンクはスキップ）
-5) **Monaco Editor**：遅延ロード、Python/JSON/MDハイライト、折りたたみ
-6) **スキーマ固定整形**：JSONスキーマ検証→自動リトライ
-7) **RAGの要約パイプ**：スライディングウィンドウ→メタ要約→抽出リンク
+3) **Monaco Editor**：遅延ロード、Python/JSON/MDハイライト、折りたたみ
+4) **スキーマ固定整形**：JSONスキーマ検証→自動リトライ
+5) **RAGの要約パイプ**：スライディングウィンドウ→メタ要約→抽出リンク
 
 ---
 

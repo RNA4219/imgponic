@@ -5,4 +5,5 @@ where cargo >nul 2>nul || (echo Rust/Cargo not found. Install from https://rustu
 call npm i || exit /b 1
 call npm run build || exit /b 1
 call npx tauri build --bundles nsis || exit /b 1
-echo Build artifacts under: src-tauri\target\release\bundle\
+set "BUNDLE_DIR=%CD%\target\release\bundle"
+echo Build artifacts under: %BUNDLE_DIR%\
