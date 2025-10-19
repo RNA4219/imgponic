@@ -13,7 +13,7 @@ gtk4 = [
 ]
 # 互換レイヤー追加時の集約用エイリアス。新規レイヤーは gtk4 へ統合すること。
 gtk4_compat = ["gtk4"]
-security = ["dep:glib_security"]
+security = []
 
 [dependencies]
 tauri = { version = "2", features = [], optional = true }
@@ -31,7 +31,6 @@ futures-util = "0.3"
 tauri-plugin-fs = { version = "2", optional = true }
 tauri-plugin-dialog = { version = "2", optional = true }
 tauri-plugin-clipboard-manager = { version = "2", optional = true }
-glib_security = { package = "glib", version = "0.20", optional = true }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -39,6 +38,8 @@ tauri-build = { version = "2", features = [] }
 [dev-dependencies]
 insta = "1"
 tempfile = "3"
+semver = "1"
+toml = "0.8"
 
 [[test]]
 name = "glib_stack"

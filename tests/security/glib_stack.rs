@@ -1,56 +1,62 @@
 use std::fs;
 
-fn parse_version_components(version: &str) -> Option<(u32, u32, u32)> {
-    let core = version.split(['+', '-']).next().map(str::trim)?;
-    let mut parts = core.split('.');
+use semver::Version;
 
-    let major = parts.next()?.parse().ok()?;
-    let minor = parts.next().unwrap_or("0").parse().ok()?;
-    let patch = parts.next().unwrap_or("0").parse().ok()?;
-
-    Some((major, minor, patch))
+fn read_lockfile() -> toml::Value {
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let lock_path = format!("{manifest_dir}/Cargo.lock");
+    let contents = fs::read_to_string(lock_path).expect("Cargo.lock should be readable");
+    toml::from_str(&contents).expect("Cargo.lock should parse as TOML")
 }
 
 #[test]
-fn glib_version_is_at_least_0_20_0() {
-    let lockfile = fs::read_to_string("Cargo.lock").expect("Cargo.lock should be readable");
+#[cfg(feature = "security")]
+fn glib_and_companions_are_upgraded() {
+    let lock = read_lockfile();
+    let packages = lock
+        .get("package")
+        .and_then(|v| v.as_array())
+        .expect("Cargo.lock should contain packages");
 
-    let mut in_glib_package = false;
-    let mut max_version: Option<((u32, u32, u32), String)> = None;
+    let mut max_glib: Option<Version> = None;
+    let mut has_gtk4 = false;
+    let mut has_webkit6 = false;
+    let mut has_gtk3 = false;
+    let mut has_webkit2gtk = false;
 
-    for line in lockfile.lines() {
-        let trimmed = line.trim();
-
-        if trimmed == "[[package]]" {
-            in_glib_package = false;
+    for pkg in packages {
+        let Some(name) = pkg.get("name").and_then(|v| v.as_str()) else {
             continue;
-        }
+        };
+        let version_str = pkg
+            .get("version")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default();
 
-        if trimmed == "name = \"glib\"" {
-            in_glib_package = true;
-            continue;
-        }
-
-        if in_glib_package && trimmed.starts_with("version =") {
-            if let Some(version_value) = trimmed.split('"').nth(1) {
-                if let Some(parsed) = parse_version_components(version_value) {
-                    match max_version {
-                        Some((current, _)) if current >= parsed => {}
-                        _ => {
-                            max_version = Some((parsed, version_value.to_string()));
-                        }
-                    }
+        match name {
+            "glib" => {
+                if let Ok(version) = Version::parse(version_str) {
+                    max_glib = Some(match max_glib {
+                        Some(current) => current.max(version),
+                        None => version,
+                    });
                 }
             }
+            "gtk4" => has_gtk4 = true,
+            "webkit6" => has_webkit6 = true,
+            "gtk" => has_gtk3 = true,
+            "webkit2gtk" => has_webkit2gtk = true,
+            _ => {}
         }
     }
 
-    let (parsed_version, version_value) = max_version
-        .expect("glib entry with a version should exist in Cargo.lock");
-
+    let max_glib = max_glib.expect("glib should appear in Cargo.lock");
     assert!(
-        parsed_version >= (0, 20, 0),
-        "glib version too old: {}",
-        version_value
+        max_glib >= Version::parse("0.20.0").unwrap(),
+        "glib version too old: {max_glib}"
     );
+    assert!(has_gtk4, "gtk4 not present in Cargo.lock");
+    assert!(has_webkit6, "webkit6 not present in Cargo.lock");
+    assert!(!has_gtk3, "gtk (GTK3) should be removed from Cargo.lock");
+    assert!(!has_webkit2gtk, "webkit2gtk should be removed from Cargo.lock");
 }
