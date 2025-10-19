@@ -1081,3 +1081,67 @@ domTest('clears accumulated stream text after aborts and errors', async () => {
   await act(async () => { root.unmount() })
   container.remove()
 })
+
+domTest('defers save_run until stream completion without duplicate start', async () => {
+  let capturedHandlers: Parameters<UseOllamaStreamFn>[0] | null = null; let resolveStream: (() => void) | null = null; let startCalls = 0; const saveRunCalls: Array<Record<string, unknown>> = []
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),
+    invoke: async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'save_run') { saveRunCalls.push(args ?? {}); return 'ok' }
+      return undefined
+    },
+    useOllamaStream: handlers => {
+      capturedHandlers = handlers
+      let streaming = false
+      const api: ReturnType<UseOllamaStreamFn> = {
+        startStream: async () => {
+          startCalls += 1
+          streaming = true
+          api.isStreaming = true
+          handlers?.onChunk?.('alpha ')
+          await new Promise<void>(resolve => {
+            resolveStream = () => {
+              streaming = false
+              api.isStreaming = false
+              resolve()
+            }
+          })
+        },
+        abortStream: async () => {
+          streaming = false
+          api.isStreaming = false
+        },
+        appendChunk: chunk => handlers?.onChunk?.(chunk),
+        isStreaming: streaming
+      }
+      return api
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div')); const root = createRoot(container)
+  try {
+    await act(async () => { root.render(<App />) })
+    const runButton = container.querySelector('.runpulse') as HTMLButtonElement | null
+    if (!runButton) throw new Error('Expected run button')
+
+    await act(async () => { runButton.click(); await Promise.resolve() })
+    await flushEffects()
+    expect(startCalls).toBe(1); expect(saveRunCalls).toHaveLength(0)
+    await act(async () => { capturedHandlers?.onChunk?.('beta') })
+    await flushEffects()
+    expect(startCalls).toBe(1); expect(saveRunCalls).toHaveLength(0)
+
+    await act(async () => { resolveStream?.(); await capturedHandlers?.onEnd?.() })
+    await flushEffects()
+    expect(startCalls).toBe(1); expect(saveRunCalls).toHaveLength(1)
+    const saveArgs = saveRunCalls[0] as { response_text?: string }; expect(saveArgs.response_text).toBe('alpha beta')
+    const rightTextarea = container.querySelector('textarea[data-side="right"]')
+    expect(rightTextarea).toBeInstanceOf(HTMLTextAreaElement); expect(rightTextarea?.value).toBe('alpha beta')
+  } finally {
+    await act(async () => { root.unmount() }); container.remove()
+  }
+})
