@@ -712,6 +712,77 @@ domTest('aborting stream resets ollama error and calls abort once', async () => 
   }
 })
 
+domTest('run button starts stream once and stop button aborts once', async () => {
+  const startStream = vi.fn(async () => {})
+  const abortStream = vi.fn(async () => {})
+
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),
+    useOllamaStream: handlers => {
+      const [streaming, setStreaming] = React.useState(false)
+      return {
+        startStream: React.useCallback(async () => {
+          setStreaming(true)
+          await startStream()
+        }, [startStream]),
+        abortStream: React.useCallback(async () => {
+          setStreaming(false)
+          await abortStream()
+        }, [abortStream]),
+        appendChunk: handlers.onChunk ?? (() => {}),
+        isStreaming: streaming
+      }
+    },
+    invoke: async (cmd: string) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  try {
+    await act(async () => { root.render(<App />) })
+
+    const runButton = await waitForElement(
+      () => container.querySelector('.runpulse') as HTMLButtonElement | null,
+      'run button'
+    )
+    const stopButton = await waitForElement(
+      () => Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('停止')) as HTMLButtonElement | null,
+      'stop button'
+    )
+
+    expect(stopButton.disabled).toBe(true)
+
+    await act(async () => { runButton.click() })
+    await flushEffects()
+    expect(startStream).toHaveBeenCalledTimes(1)
+    expect(stopButton.disabled).toBe(false)
+
+    await act(async () => { runButton.click() })
+    await flushEffects()
+    expect(startStream).toHaveBeenCalledTimes(1)
+
+    await act(async () => { stopButton.click() })
+    await flushEffects()
+    expect(abortStream).toHaveBeenCalledTimes(1)
+    expect(stopButton.disabled).toBe(true)
+
+    await act(async () => { stopButton.click() })
+    await flushEffects()
+    expect(abortStream).toHaveBeenCalledTimes(1)
+  } finally {
+    await act(async () => { root.unmount() })
+    container.remove()
+  }
+})
+
 domTest('redacts over-limit secrets in preview and compose invocation', async () => {
   const secret = 'AKIA1234567890ABCDEF'
   const filler = 'x'.repeat(40000)
