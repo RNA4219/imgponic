@@ -121,15 +121,21 @@ fn _compose_prompt(
     let recipe: Recipe = read_yaml(&rp)?;
 
     // merge params (inline override recipe.params)
-    let mut params = recipe.params.clone();
-    if let (Some(mut obj), Some(inline)) = (params.as_object().cloned(), inline_params) {
+    let mut params_map = recipe
+        .params
+        .as_object()
+        .cloned()
+        .unwrap_or_else(serde_json::Map::new);
+
+    if let Some(inline) = inline_params {
         if let Some(inline_obj) = inline.as_object() {
             for (k, v) in inline_obj.iter() {
-                obj.insert(k.clone(), v.clone());
+                params_map.insert(k.clone(), v.clone());
             }
         }
-        params = serde_json::Value::Object(obj);
     }
+
+    let params = serde_json::Value::Object(params_map);
 
     // load fragments
     let mut blocks: Vec<String> = vec![];

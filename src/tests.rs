@@ -123,6 +123,7 @@ fn load_txt_excerpt_rejects_out_of_sandbox() {
 
 mod compose_prompt_sandbox {
     use super::{DataDirGuard, _compose_prompt};
+    use serde_json::json;
     use std::fs;
     use std::path::Path;
 
@@ -187,5 +188,17 @@ mod compose_prompt_sandbox {
 
         let result = _compose_prompt(&recipe_path, None).expect("compose prompt");
         assert!(result.final_prompt.contains("Hello"));
+    }
+
+    #[test]
+    fn compose_prompt_inline_params_without_recipe_params_keeps_user_input() {
+        let temp = tempdir().expect("failed to create temp dir");
+        let recipe_path = write_valid_fixture(temp.path());
+        let _guard = DataDirGuard::set(temp.path());
+
+        let inline_params = json!({ "user_input": "Inline text" });
+        let result = _compose_prompt(&recipe_path, Some(inline_params)).expect("compose prompt");
+
+        assert!(result.final_prompt.contains("Inline text"));
     }
 }
