@@ -10,6 +10,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Install GTK stack
+        run: ./scripts/install-gtk4-webkit6-dev.sh
+      - name: Assert GTK stack
+        run: ./tools/ci/assert-gtk-stack.sh
       - name: Run tests
         run: |
           set -o pipefail
