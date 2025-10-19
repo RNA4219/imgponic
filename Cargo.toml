@@ -5,14 +5,18 @@ edition = "2021"
 
 [features]
 default = ["gtk4"]
-tauri_runtime = [
+gtk4 = [
     "dep:tauri",
     "dep:tauri-plugin-fs",
     "dep:tauri-plugin-dialog",
     "dep:tauri-plugin-clipboard-manager",
+    "tauri/gtk4",
+    "tauri-plugin-fs/native",
+    "tauri-plugin-dialog/native",
+    "tauri-plugin-clipboard-manager/native",
 ]
-gtk4 = ["tauri_runtime"]
-gtk4_compat = ["tauri_runtime"]
+# 将来の互換レイヤーを追加する際のエイリアス
+gtk4_compat = ["gtk4"]
 
 [dependencies]
 tauri = { version = "2", features = [], optional = true }
