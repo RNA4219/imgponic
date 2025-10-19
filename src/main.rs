@@ -633,7 +633,20 @@ fn write_workspace(app: tauri::AppHandle, ws: Workspace) -> Result<String, Strin
     }
 }
 
+#[cfg(target_os = "linux")]
+fn apply_linux_overrides<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    // GTK4/Wayland では従来の X11 系ヒントが効かないため、明示設定は避ける
+    builder
+}
+
+#[cfg(not(target_os = "linux"))]
+fn apply_linux_overrides<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    builder
+}
+
 pub fn configure_builder<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    let builder = apply_linux_overrides(builder);
+
     builder
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
