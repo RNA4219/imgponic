@@ -227,20 +227,41 @@ export default function App() {
   }, [])
 
   const clearStreamedResponse = useCallback(() => {
+    streamedResponseRef.current = ''
     setRightText('')
   }, [])
 
-  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
-    onChunk: chunk => setRightText(prev => prev + chunk),
-    onEnd: () => setRunning(false),
-    onError: message => {
+  const appendStreamChunk = useCallback((chunk: string) => {
+    if (!chunk) return
+    streamedResponseRef.current += chunk
+    setRightText(prev => prev + chunk)
+  }, [])
+
+  const handleStreamError = useCallback(
+    (message: string) => {
       console.error('ollama stream error', message)
       setRunning(false)
       setOllamaError(describeOllamaError(message))
       clearStreamedResponse()
     },
-    [clearStreamedResponse, setOllamaError]
+    [clearStreamedResponse]
   )
+
+  const handleStreamEnd = useCallback(async () => {
+    setRunning(false)
+    const snapshot = composedRef.current
+    const responseText = streamedResponseRef.current
+    if (!snapshot || !responseText) return
+    try {
+      await invokeFn('save_run', {
+        recipePath,
+        final_prompt: snapshot.final_prompt,
+        response_text: responseText
+      })
+    } catch (error) {
+      console.error('save_run failed', error)
+    }
+  }, [invokeFn, recipePath])
 
   const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
     onChunk: appendStreamChunk,
