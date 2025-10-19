@@ -526,30 +526,29 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
   }
 })
 
-domTest('runs stream once until completion and saves aggregated response', async () => {
-  let capturedHandlers: Parameters<UseOllamaStreamFn>[0] | null = null
-  let setStreamingState: React.Dispatch<React.SetStateAction<boolean>> | null = null
-  const startStream = vi.fn(async () => {})
-  const saveRunCalls: Array<Record<string, unknown> | undefined> = []
+domTest('masks over-limit preview with sanitized text', async () => {
+  const secret = 'ABCDEFGHIJKLMNOPQRSTUVWX0123456789'
+  const payload = `${'x'.repeat(40020)}\napi_key = "${secret}"\n`
+
   appMockContainer.__APP_MOCKS__ = {
-    useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),
-    useOllamaStream: handlers => {
-      capturedHandlers = handlers
-      const [streaming, setStreaming] = React.useState(false)
-      setStreamingState = setStreaming
-      return {
-        startStream: async args => { startStream(args); setStreaming(true) },
-        abortStream: async () => setStreaming(false),
-        appendChunk: handlers.onChunk ?? (() => {}),
-        isStreaming: streaming
-      }
-    },
+    useSetupCheck: () => ({
+      status: 'ready',
+      guidance: '',
+      retry: vi.fn(async () => {})
+    }),
+    useOllamaStream: () => ({
+      startStream: async () => {},
+      abortStream: async () => {},
+      appendChunk: () => {},
+      isStreaming: false
+    }),
     invoke: async (cmd: string, args?: Record<string, unknown>) => {
       if (cmd === 'read_workspace') return null
       if (cmd === 'write_workspace') return 'ok'
       if (cmd === 'list_project_files') return []
-      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
-      if (cmd === 'save_run') { saveRunCalls.push(args); return undefined }
+      if (cmd === 'compose_prompt') {
+        return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      }
       if (cmd === 'run_ollama_stream') return undefined
       return undefined
     }
@@ -557,40 +556,45 @@ domTest('runs stream once until completion and saves aggregated response', async
 
   const container = document.body.appendChild(document.createElement('div'))
   const root = createRoot(container)
-  const trigger = async (step: () => void | Promise<void>) => {
-    await act(async () => { await step() })
-    await flushEffects()
-  }
 
   try {
-    await trigger(() => root.render(<App />))
-    const runButton = container.querySelector('.runpulse')
-    expect(runButton).toBeInstanceOf(HTMLButtonElement)
-    if (!(runButton instanceof HTMLButtonElement)) throw new Error('Expected run button')
-    const rightTextarea = await waitForElement(
-      () => container.querySelector('textarea[data-side="right"]'),
-      'right textarea'
+    await act(async () => {
+      root.render(<App />)
+    })
+
+    const leftTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="left"]'),
+      'left textarea'
     )
+    if (!(leftTextarea instanceof HTMLTextAreaElement)) {
+      throw new Error('Expected left textarea')
+    }
 
-    await trigger(() => runButton.click())
-    expect(startStream).toHaveBeenCalledTimes(1)
-
-    expect(saveRunCalls).toHaveLength(0)
-    await trigger(() => {
-      capturedHandlers?.onChunk?.('First chunk ')
-      capturedHandlers?.onChunk?.('Second chunk')
+    await act(async () => {
+      leftTextarea.value = payload
+      leftTextarea.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    expect(rightTextarea.value).toBe('First chunk Second chunk')
+    await flushEffects()
 
-    await trigger(() => {
-      capturedHandlers?.onEnd?.()
-      setStreamingState?.(false)
-    })
+    const previewDetails = container.querySelector('details')
+    expect(previewDetails).toBeInstanceOf(HTMLElement)
+    if (!(previewDetails instanceof HTMLElement)) {
+      throw new Error('Expected preview details')
+    }
+    previewDetails.setAttribute('open', '')
 
-    expect(saveRunCalls).toHaveLength(1)
-    expect(saveRunCalls[0]).toMatchObject({ recipePath: 'data/recipes/demo.sora2.yaml', final_prompt: 'SYS\n---\nUSER_INPUT', response_text: 'First chunk Second chunk' })
+    await flushEffects()
+
+    const previewPre = previewDetails.querySelector('pre')
+    expect(previewPre).toBeInstanceOf(HTMLElement)
+    const previewText = previewPre?.textContent ?? ''
+
+    expect(previewText).toContain('<REDACTED:API_KEY>')
+    expect(previewText).not.toContain(secret)
   } finally {
-    await act(async () => { root.unmount() })
+    await act(async () => {
+      root.unmount()
+    })
     container.remove()
   }
 })

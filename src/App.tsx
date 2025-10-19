@@ -232,45 +232,19 @@ export default function App() {
     setRightText('')
   }, [])
 
-  const appendStreamChunk = useCallback((chunk: string) => {
-    if (!chunk) return
-    streamedResponseRef.current += chunk
-    setRightText(prev => prev + chunk)
-  }, [])
-
-  const handleStreamError = useCallback(
-    (message: string) => {
-      console.error('ollama stream error', message)
-      setRunning(false)
-      setOllamaError(describeOllamaError(message))
-      clearStreamedResponse()
+  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook(
+    {
+      onChunk: chunk => setRightText(prev => prev + chunk),
+      onEnd: () => setRunning(false),
+      onError: message => {
+        console.error('ollama stream error', message)
+        setRunning(false)
+        setOllamaError(describeOllamaError(message))
+        clearStreamedResponse()
+      }
     },
     [clearStreamedResponse]
   )
-
-  const handleStreamEnd = useCallback(async () => {
-    setRunning(false)
-    const snapshot = composedRef.current
-    const responseText = streamedResponseRef.current
-    if (!snapshot || !responseText) return
-    try {
-      await invokeFn('save_run', {
-        recipePath,
-        final_prompt: snapshot.final_prompt,
-        response_text: responseText
-      })
-    } catch (error) {
-      console.error('save_run failed', error)
-    }
-  }, [invokeFn, recipePath])
-
-  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
-    onChunk: appendStreamChunk,
-    onEnd: () => {
-      void handleStreamEnd()
-    },
-    onError: handleStreamError
-  })
   const abortStream = useCallback(async () => {
     resetOllamaError()
     setRunning(false)
@@ -469,12 +443,12 @@ export default function App() {
   const sanitization = useMemo(() => sanitizeUserInput(rawUserInput), [rawUserInput])
   const sanitizedPreview = useMemo(() => {
     const base = sanitization.sanitized
-    if (!sanitization.overLimit) {
-      return base
+    if (!base) {
+      return ''
     }
-    const MAX_PREVIEW_LENGTH = 40000
-    return base.length > MAX_PREVIEW_LENGTH ? base.slice(0, MAX_PREVIEW_LENGTH) : base
-  }, [sanitization])
+    const SAFE_PREVIEW_LENGTH = 40000
+    return base.length > SAFE_PREVIEW_LENGTH ? `${base.slice(0, SAFE_PREVIEW_LENGTH)}…` : base
+  }, [sanitization.sanitized])
   const [userInputWarnings, setUserInputWarnings] = useState<{ maskedTypes: string[]; overLimit: boolean }>(() => ({
     maskedTypes: sanitization.maskedTypes,
     overLimit: sanitization.overLimit
