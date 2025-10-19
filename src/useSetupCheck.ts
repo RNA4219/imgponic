@@ -65,23 +65,30 @@ export type UseSetupCheckResult = SetupState & {
 
 export const useSetupCheck = (currentModel: string): UseSetupCheckResult => {
   const [state, setState] = useState<SetupState>({ status: 'ok', guidance: '' })
+  const lastCheckedModelRef = useRef<string | null>(null)
 
-  const runCheck = useCallback(async () => {
+  const runCheck = useCallback(async (model: string) => {
     try {
-      const response = await invoke<SetupCheckResponse>('check_ollama_setup', { model: currentModel })
+      const response = await invoke<SetupCheckResponse>('check_ollama_setup', { model })
       setState(normalizeResponse(response))
     } catch (_error) {
       setState({ status: 'offline', guidance: DEFAULT_GUIDANCE.offline })
     }
-  }, [currentModel])
+  }, [])
 
   useEffect(() => {
-    void runCheck()
-  }, [runCheck])
+    if (lastCheckedModelRef.current === currentModel) {
+      return
+    }
+
+    lastCheckedModelRef.current = currentModel
+    void runCheck(currentModel)
+  }, [currentModel, runCheck])
 
   const retry = useCallback(async () => {
-    await runCheck()
-  }, [runCheck])
+    lastCheckedModelRef.current = currentModel
+    await runCheck(currentModel)
+  }, [currentModel, runCheck])
 
   return {
     ...state,

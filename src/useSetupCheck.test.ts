@@ -98,6 +98,28 @@ describe('useSetupCheck', () => {
     await hook.unmount()
   })
 
+  it('invokes setup check for every new model provided on rerender', async () => {
+    vi.mocked(invoke)
+      .mockResolvedValueOnce({ status: 'ok', guidance: 'phi ready' })
+      .mockResolvedValueOnce({ status: 'ok', guidance: 'mistral ready' })
+      .mockResolvedValueOnce({ status: 'ok', guidance: 'llama ready' })
+
+    const hook = await renderHook('phi')
+    await flushEffects()
+
+    await hook.rerender('mistral')
+    await flushEffects()
+
+    await hook.rerender('llama')
+    await flushEffects()
+
+    expect(invoke).toHaveBeenCalledTimes(3)
+    expect(invoke).toHaveBeenLastCalledWith('check_ollama_setup', { model: 'llama' })
+    expect(hook.result.current.guidance).toBe('llama ready')
+
+    await hook.unmount()
+  })
+
   it('marks offline when invoke fails and allows retry', async () => {
     vi.mocked(invoke)
       .mockRejectedValueOnce(new Error('offline'))
