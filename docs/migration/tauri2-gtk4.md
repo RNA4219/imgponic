@@ -11,10 +11,10 @@
 
 ## 条件付きビルド方針
 
-- `run_ollama_stream_impl`（`src/main.rs`）: `#[cfg(feature = "gtk4")]` / `#[cfg_attr(feature = "gtk4", tauri::command)]` を両方付与済み。
-- `run_ollama_stream`（`src/main.rs`）:  `#[cfg_attr(feature = "gtk4", tauri::command)]` のみ。`#[cfg(feature = "gtk4")]` を追加する必要がある。
-- `abort_current_stream`（`src/main.rs`）: `#[cfg_attr(feature = "gtk4", tauri::command)]` は存在するが、`#[cfg(feature = "gtk4")]` が欠落しており今後の修正対象。
+- `run_ollama_stream_impl`（`src/lib.rs`）: `#[cfg(feature = "gtk4")]` / `#[cfg_attr(feature = "gtk4", tauri::command)]` を両方付与済み。
+- `run_ollama_stream`（`src/main.rs` の `run_ollama_stream_cmd`）: `#[cfg(feature = "gtk4")]` と `#[cfg_attr(feature = "gtk4", tauri::command)]` の双方を適用済み。
+- `abort_current_stream`（`src/main.rs` の `abort_current_stream_cmd`）: `#[cfg(feature = "gtk4")]` と `#[cfg_attr(feature = "gtk4", tauri::command)]` の双方を適用済み。
 - `workspace_path` / `read_workspace` / `write_workspace`（`src/main.rs`）: `#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]` と `#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]` を使用して GTK4 系のビルドでのみ公開。
 - `configure_builder`（`src/main.rs`）: `#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]` で GTK4 有効時のみ GUI ビルドを構成。
 
-特に `abort_current_stream` への `#[cfg(feature = "gtk4")]` 付与漏れは GTK4 ビルド専用コマンド群との整合性を欠くため、後続作業での是正が必要。
+GTK4 ビルド専用コマンド群はいずれも `#[cfg(feature = "gtk4")]` を付与済みで、公開条件が揃っている。
