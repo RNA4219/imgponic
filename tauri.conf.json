@@ -44,6 +44,15 @@
     }
   },
   "bundle": {
-    "active": false
+    "active": false,
+    "linux": {
+      "deb": {
+        "depends": [
+          "libgtk-4-1",
+          "libwebkitgtk-6.0-0",
+          "libsoup-3.0-0"
+        ]
+      }
+    }
   }
 }
