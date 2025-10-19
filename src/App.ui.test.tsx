@@ -783,6 +783,94 @@ domTest('run button starts stream once and stop button aborts once', async () =>
   }
 })
 
+domTest('stop button aborts stream once without saving partial response', async () => {
+  const startStreamImpl = vi.fn(async () => {})
+  const abortStreamImpl = vi.fn(async () => {})
+  const saveRunCalls: Array<Record<string, unknown> | undefined> = []
+  let capturedHandlers: Parameters<UseOllamaStreamFn>[0] | null = null
+
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),
+    useOllamaStream: handlers => {
+      capturedHandlers = handlers ?? null
+      const [streaming, setStreaming] = React.useState(false)
+      return {
+        startStream: React.useCallback(
+          async args => {
+            setStreaming(true)
+            await startStreamImpl(args)
+          },
+          [startStreamImpl]
+        ),
+        abortStream: React.useCallback(
+          async () => {
+            setStreaming(false)
+            await abortStreamImpl()
+            await handlers?.onEnd?.()
+          },
+          [abortStreamImpl, handlers]
+        ),
+        appendChunk: handlers?.onChunk ?? (() => {}),
+        isStreaming: streaming
+      }
+    },
+    invoke: async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'save_run') {
+        saveRunCalls.push(args)
+        return undefined
+      }
+      return undefined
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  try {
+    await act(async () => { root.render(<App />) })
+
+    const runButton = await waitForElement(
+      () => container.querySelector('.runpulse') as HTMLButtonElement | null,
+      'run button'
+    )
+    const stopButton = await waitForElement(
+      () => Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('停止')) as HTMLButtonElement | null,
+      'stop button'
+    )
+    const rightTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="right"]') as HTMLTextAreaElement | null,
+      'right textarea'
+    )
+
+    await act(async () => { runButton.click() })
+    await flushEffects()
+
+    expect(startStreamImpl).toHaveBeenCalledTimes(1)
+    expect(stopButton.disabled).toBe(false)
+    expect(capturedHandlers).toBeTruthy()
+
+    await act(async () => {
+      capturedHandlers?.onChunk?.('partial output')
+    })
+    await flushEffects()
+    expect(rightTextarea.value).toBe('partial output')
+
+    await act(async () => { stopButton.click() })
+    await flushEffects()
+
+    expect(abortStreamImpl).toHaveBeenCalledTimes(1)
+    expect(saveRunCalls).toHaveLength(0)
+    expect(rightTextarea.value).toBe('')
+  } finally {
+    await act(async () => { root.unmount() })
+    container.remove()
+  }
+})
+
 domTest('redacts over-limit secrets in preview and compose invocation', async () => {
   const secret = 'AKIA1234567890ABCDEF'
   const filler = 'x'.repeat(40000)

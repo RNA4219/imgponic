@@ -231,15 +231,25 @@ export default function App() {
     setHasDangerWords(containsDangerWords(value))
   }, [])
 
-  const clearStreamedResponse = useCallback(() => {
+  const clearStreamedResponse = useCallback((options?: { markSaved?: boolean }) => {
     streamedResponseRef.current = ''
-    hasSavedRunRef.current = false
+    hasSavedRunRef.current = options?.markSaved ?? false
     setRightText('')
   }, [])
 
-  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook(
-    {
-      onChunk: chunk => {
+  const handleStreamError = useCallback(
+    (message: string) => {
+      console.error('ollama stream error', message)
+      setRunning(false)
+      setOllamaError(describeOllamaError(message))
+      clearStreamedResponse({ markSaved: true })
+    },
+    [clearStreamedResponse, setOllamaError, setRunning]
+  )
+
+  const streamHandlers = useMemo(
+    () => ({
+      onChunk: (chunk: string) => {
         streamedResponseRef.current += chunk
         setRightText(prev => prev + chunk)
       },
@@ -256,30 +266,33 @@ export default function App() {
         } catch (error) {
           console.error('save_run failed', error)
           setOllamaError(describeOllamaError(error))
-          clearStreamedResponse()
-          hasSavedRunRef.current = true
+          clearStreamedResponse({ markSaved: true })
         }
       },
-      onError: message => {
-        console.error('ollama stream error', message)
-        setRunning(false)
-        setOllamaError(describeOllamaError(message))
-        clearStreamedResponse()
-        hasSavedRunRef.current = true
-      }
-    },
-    onError: message => {
-      console.error('ollama stream error', message)
-      setRunning(false)
-      setOllamaError(describeOllamaError(message))
-      clearStreamedResponse()
-    }
-  })
+      onError: handleStreamError
+    }),
+    [
+      clearStreamedResponse,
+      handleStreamError,
+      invokeFn,
+      recipePath,
+      setOllamaError,
+      setRightText,
+      setRunning
+    ]
+  )
+
+  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook(streamHandlers)
   const abortStream = useCallback(async () => {
     resetOllamaError()
     setRunning(false)
-    await rawAbortStream()
-    clearStreamedResponse()
+    hasSavedRunRef.current = true
+    try {
+      await rawAbortStream()
+    } finally {
+      clearStreamedResponse()
+      hasSavedRunRef.current = false
+    }
   }, [clearStreamedResponse, resetOllamaError, rawAbortStream])
 
   useEffect(() => {
