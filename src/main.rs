@@ -274,7 +274,10 @@ async fn run_ollama_stream(
                 }
                 match parse_ollama_jsonl_line(&raw) {
                     Ok(parsed) => {
-                        let ParsedOllamaLine { raw: parsed_raw, events } = parsed;
+                        let ParsedOllamaLine {
+                            raw: parsed_raw,
+                            events,
+                        } = parsed;
                         let emit_payload = parsed_raw.clone();
                         _raw_lines.push(parsed_raw);
                         let _ = window_for_task.emit("ollama:jsonl", emit_payload);
@@ -688,7 +691,7 @@ pub fn configure_builder<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri
 }
 
 fn main() {
-    configure_builder(tauri::Builder::default())
+    configure_builder(tauri::Builder::new())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
