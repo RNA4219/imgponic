@@ -896,6 +896,90 @@ domTest('loads corpus excerpt, injects into compose params, and renders preview 
   container.remove()
 })
 
+domTest('toggles focus mode with shortcut and panel buttons', async () => {
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),
+    invoke: async (cmd: string) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      return undefined
+    },
+    useOllamaStream: () => ({
+      startStream: async () => {},
+      abortStream: async () => {},
+      appendChunk: () => {},
+      isStreaming: false
+    })
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+  await act(async () => { root.render(<App />) })
+
+  const split = container.querySelector('.split')
+  expect(split).toBeInstanceOf(HTMLElement)
+  if (!(split instanceof HTMLElement)) throw new Error('Expected split container')
+
+  const leftTextarea = container.querySelector('textarea[data-side="left"]')
+  const rightTextarea = container.querySelector('textarea[data-side="right"]')
+  expect(leftTextarea).toBeInstanceOf(HTMLTextAreaElement)
+  expect(rightTextarea).toBeInstanceOf(HTMLTextAreaElement)
+  if (!(leftTextarea instanceof HTMLTextAreaElement) || !(rightTextarea instanceof HTMLTextAreaElement)) {
+    throw new Error('Expected both textareas')
+  }
+
+  await act(async () => { leftTextarea.focus() })
+  await flushEffects()
+
+  await act(async () => {
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'F', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true })
+    )
+  })
+  await flushEffects()
+
+  expect(split.classList.contains('focus-left')).toBe(true)
+  const rightPanel = container.querySelector('[data-panel="right"]')
+  expect(rightPanel).toBeInstanceOf(HTMLElement)
+  if (rightPanel instanceof HTMLElement) {
+    expect(rightPanel.getAttribute('data-focus-hidden')).toBe('true')
+  }
+
+  await act(async () => {
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'F', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true })
+    )
+  })
+  await flushEffects()
+
+  expect(split.classList.contains('focus-left')).toBe(false)
+
+  await act(async () => { rightTextarea.focus() })
+  await flushEffects()
+
+  await act(async () => {
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'f', metaKey: true, shiftKey: true, bubbles: true, cancelable: true })
+    )
+  })
+  await flushEffects()
+
+  expect(split.classList.contains('focus-right')).toBe(true)
+  const rightToggle = container.querySelector('[data-testid="focus-toggle-right"]')
+  expect(rightToggle).toBeInstanceOf(HTMLButtonElement)
+  if (!(rightToggle instanceof HTMLButtonElement)) throw new Error('Expected right focus toggle')
+
+  await act(async () => { rightToggle.click() })
+  await flushEffects()
+
+  expect(split.classList.contains('focus-right')).toBe(false)
+
+  await act(async () => { root.unmount() })
+  container.remove()
+})
+
 domTest('renders danger word badge only when left pane contains dangerous phrases', async () => {
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),

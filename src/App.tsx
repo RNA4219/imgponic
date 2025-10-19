@@ -188,6 +188,7 @@ export default function App() {
   const INITIAL_LEFT_TEXT = 'ここに入力。Ollama整形は右の▶で実行。'
   const [leftText, setLeftText] = useState<string>(INITIAL_LEFT_TEXT)
   const [rightText, setRightText] = useState<string>('（ここに整形結果が出ます）')
+  const [focusTarget, setFocusTarget] = useState<'left' | 'right' | null>(null)
   const [hasDangerWords, setHasDangerWords] = useState<boolean>(() => containsDangerWords(INITIAL_LEFT_TEXT))
 
   // レシピ/モデル
@@ -538,6 +539,20 @@ export default function App() {
         e.preventDefault()
         copy(rightText)
       }
+      if (mod && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setFocusTarget(prev => {
+          const activeElement = typeof document !== 'undefined' ? document.activeElement : null
+          const activeSide = (() => {
+            if (!activeElement || !(activeElement instanceof HTMLElement)) return null
+            const side = activeElement.getAttribute('data-side')
+            return side === 'left' || side === 'right' ? side : null
+          })()
+          const nextTarget = activeSide ?? prev ?? 'left'
+          return prev === nextTarget ? null : nextTarget
+        })
+        return
+      }
 
       let preventOverlayToggle = false
       setShowKeybindOverlay(prev => {
@@ -734,12 +749,25 @@ export default function App() {
       )}
 
       {/* 分割ビュー */}
-      <div className="split">
+      <div className={`split${focusTarget ? ` focus-${focusTarget}` : ''}`}>
         {/* 左：入力 */}
-        <div className="panel">
+        <div
+          className="panel"
+          data-panel="left"
+          data-focus-hidden={focusTarget === 'right' ? 'true' : 'false'}
+        >
           <h3>
             <span>入力</span>
             <span className="toolbar">
+              <button
+                type="button"
+                className={`btn${focusTarget === 'left' ? ' primary' : ''}`}
+                data-testid="focus-toggle-left"
+                aria-pressed={focusTarget === 'left'}
+                onClick={() => setFocusTarget(prev => (prev === 'left' ? null : 'left'))}
+              >
+                {focusTarget === 'left' ? 'フォーカス解除' : '集中'}
+              </button>
               <button className="btn" onClick={() => writeText(leftText)}>コピー</button>
               <button className="btn" onClick={() => saveAs('left.txt', leftText)}>別名保存</button>
             </span>
@@ -757,10 +785,23 @@ export default function App() {
         </div>
 
         {/* 右：LLM整形出力 */}
-        <div className="panel">
+        <div
+          className="panel"
+          data-panel="right"
+          data-focus-hidden={focusTarget === 'left' ? 'true' : 'false'}
+        >
           <h3>
             <span>LLM（整形出力）</span>
             <span className="toolbar">
+              <button
+                type="button"
+                className={`btn${focusTarget === 'right' ? ' primary' : ''}`}
+                data-testid="focus-toggle-right"
+                aria-pressed={focusTarget === 'right'}
+                onClick={() => setFocusTarget(prev => (prev === 'right' ? null : 'right'))}
+              >
+                {focusTarget === 'right' ? 'フォーカス解除' : '集中'}
+              </button>
               <button className="btn" onClick={openDiffPreview}>⇧ 反映</button>
               <button className="btn" onClick={() => writeText(rightText)}>コピー</button>
               <button className="btn" onClick={() => saveAs('right.txt', rightText)}>別名保存</button>

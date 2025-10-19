@@ -8,6 +8,8 @@ body { margin:0; background:var(--bg); color:var(--ink); font-family:ui-sans-ser
 .btn.primary:hover { background:var(--accent-300); }
 .btn.primary:active { background:var(--accent-500); }
 .split { display:grid; grid-template-columns:1fr 1fr; gap:12px; height:calc(100vh - 132px); }
+.split.focus-left, .split.focus-right { grid-template-columns:1fr; }
+.split.focus-left .panel[data-panel="right"], .split.focus-right .panel[data-panel="left"] { display:none; }
 .panel { background:var(--panel); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 12px 24px -12px var(--shadow); }
 .panel h3 { margin:0; padding:10px 12px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; color:var(--ink); }
 .area { flex:1; padding:12px; }
