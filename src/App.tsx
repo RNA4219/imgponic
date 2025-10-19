@@ -228,7 +228,8 @@ export default function App() {
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
   useEffect(() => {
-    if (composedRef.current) {
+    if (composedRef.current !== null) {
+      composedRef.current = null
       setComposed(null)
     }
   }, [
@@ -335,6 +336,13 @@ export default function App() {
   const [docExcerpt, setDocExcerpt] = useState<DocExcerpt | null>(null)
   const [docExcerptStatus, setDocExcerptStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [docExcerptError, setDocExcerptError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (composedRef.current !== null) {
+      composedRef.current = null
+      setComposed(null)
+    }
+  }, [docExcerpt])
 
   const loadDocExcerpt = useCallback(async () => {
     const currentValue = corpusInputRef.current?.value ?? corpusRel
@@ -445,6 +453,7 @@ export default function App() {
         setUserInputWarnings({ maskedTypes: snapshot.maskedTypes, overLimit: snapshot.overLimit })
       }
     })
+    composedRef.current = res
     setComposed(res)
     return res
   }, [invokeFn, params, recipePath, leftText, sendSelectionOnly, leftSelection, leftSelectionStart, leftSelectionEnd])
@@ -485,7 +494,8 @@ export default function App() {
     setRunning(true)
     clearStreamedResponse()
     try {
-      const c = composed ?? await doCompose()
+      const c = composed ?? (await doCompose())
+      composedRef.current = c
       const match = USER_INPUT_SECTION_PATTERN.exec(c.final_prompt)
       const systemText = match ? c.final_prompt.slice(0, match.index) : c.final_prompt
       const userSection = match
