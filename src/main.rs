@@ -1,762 +1,155 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![cfg_attr(not(any(feature = "gtk4", feature = "gtk4_compat")), allow(dead_code))]
-
-mod ollama_stream;
-mod setup_check;
-mod txt_excerpt;
-
-#[cfg(all(test, any(feature = "gtk4", feature = "gtk4_compat")))]
-mod tests;
-
-use std::env;
-use std::fs;
-use std::io;
-use std::path::{Path, PathBuf};
-
-use anyhow::{Context, Result};
-use chrono::Local;
 #[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
-use futures_util::future::{AbortHandle, Abortable};
-#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
-use futures_util::StreamExt;
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
-use tauri::{Emitter, Manager};
-
-#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
-use crate::ollama_stream::{emit_events_for_line, parse_ollama_jsonl_line, StreamState};
-
-#[derive(Debug, Deserialize)]
-struct Recipe {
-    profile: String,
-    fragments: Vec<String>,
-    #[serde(default)]
-    params: serde_json::Value,
-}
-
-#[derive(Debug, Deserialize)]
-struct Fragment {
-    id: String,
-    kind: String,
-    #[serde(default)]
-    trust: Option<String>,
-    #[serde(default)]
-    merge_strategy: Option<String>,
-    content: String,
-}
-
-#[derive(Debug, Serialize)]
-struct ComposeResult {
-    final_prompt: String,
-    sha256: String,
-    model: String,
-}
-
-fn read_yaml<T: for<'de> Deserialize<'de>>(p: &Path) -> Result<T> {
-    let s = fs::read_to_string(p)?;
-    let v = serde_yaml::from_str::<T>(&s)?;
-    Ok(v)
-}
-
-fn render_placeholders(s: &str, params: &serde_json::Value) -> String {
-    let mut out = s.to_string();
-    if let Some(obj) = params.as_object() {
-        for (k, v) in obj.iter() {
-            let key = format!("{{{{{}}}}}", k);
-            let val = if v.is_string() {
-                v.as_str().unwrap().to_string()
-            } else {
-                v.to_string()
-            };
-            out = out.replace(&key, &val);
-        }
-    }
-    out
-}
-
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
-fn compose_prompt(
-    recipe_path: String,
-    inline_params: serde_json::Value,
-) -> Result<ComposeResult, String> {
-    _compose_prompt(&recipe_path, Some(inline_params)).map_err(|e| e.to_string())
-}
-
-fn resolve_data_root() -> Result<(PathBuf, PathBuf)> {
-    let configured = env::var("PROMPTFORGE_DATA_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("data"));
-    let absolute = if configured.is_absolute() {
-        configured.clone()
-    } else {
-        env::current_dir()?.join(&configured)
+mod commands {
+    #[cfg(feature = "gtk4")]
+    use promptforge::StreamState;
+    use promptforge::{
+        self, ComposeResult, FileContent, ProjectEntry, PromptFileEntry, SetupCheckOutcome,
+        TxtExcerpt, Workspace,
     };
-    Ok((configured, absolute))
-}
+    use serde_json::Value;
+    use tauri::AppHandle;
+    #[cfg(feature = "gtk4")]
+    use tauri::{State, WebviewWindow};
 
-fn resolve_under_base(path: &Path, configured_root: &Path, base_abs: &Path) -> PathBuf {
-    if path.is_absolute() {
-        path.to_path_buf()
-    } else if let Ok(stripped) = path.strip_prefix(configured_root) {
-        base_abs.join(stripped)
-    } else {
-        base_abs.join(path)
+    #[tauri::command]
+    pub fn compose_prompt_cmd(
+        recipe_path: String,
+        inline_params: Value,
+    ) -> Result<ComposeResult, String> {
+        promptforge::compose_prompt(recipe_path, inline_params)
     }
-}
 
-fn _compose_prompt(
-    recipe_path: &str,
-    inline_params: Option<serde_json::Value>,
-) -> Result<ComposeResult> {
-    let sandbox = env::var_os("PROMPTFORGE_DATA_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("data"));
+    #[tauri::command]
+    pub async fn run_ollama_chat_cmd(
+        model: String,
+        system_text: String,
+        user_text: String,
+    ) -> Result<String, String> {
+        promptforge::run_ollama_chat(model, system_text, user_text).await
+    }
 
-    let rp_raw = PathBuf::from(recipe_path);
-    let rp = if rp_raw.is_absolute() || rp_raw.starts_with(&sandbox) {
-        rp_raw
-    } else {
-        sandbox.join(rp_raw)
-    };
+    #[cfg(feature = "gtk4")]
+    #[tauri::command]
+    pub async fn run_ollama_stream_cmd(
+        window: WebviewWindow,
+        state: State<'_, StreamState>,
+        model: String,
+        system_text: String,
+        user_text: String,
+    ) -> Result<(), String> {
+        promptforge::run_ollama_stream(window, state, model, system_text, user_text).await
+    }
 
-    ensure_under(&sandbox, &rp)?;
+    #[cfg(feature = "gtk4")]
+    #[tauri::command]
+    pub async fn abort_current_stream_cmd(state: State<'_, StreamState>) -> Result<(), String> {
+        promptforge::abort_current_stream(state).await
+    }
 
-    let recipe: Recipe = read_yaml(&rp)?;
+    #[tauri::command]
+    pub fn save_run_cmd(
+        recipe_path: String,
+        final_prompt: String,
+        response_text: String,
+        response_jsonl: Option<String>,
+    ) -> Result<String, String> {
+        promptforge::save_run(recipe_path, final_prompt, response_text, response_jsonl)
+    }
 
-    // merge params (inline override recipe.params)
-    let mut params_map = recipe
-        .params
-        .as_object()
-        .cloned()
-        .unwrap_or_else(serde_json::Map::new);
+    #[tauri::command]
+    pub fn list_prompt_files_cmd(kind: String) -> Result<Vec<PromptFileEntry>, String> {
+        promptforge::list_prompt_files(kind)
+    }
 
-    if let Some(inline) = inline_params {
-        if let Some(inline_obj) = inline.as_object() {
-            for (k, v) in inline_obj.iter() {
-                params_map.insert(k.clone(), v.clone());
-            }
+    #[tauri::command]
+    pub fn read_prompt_file_cmd(rel_path: String) -> Result<FileContent, String> {
+        promptforge::read_prompt_file(rel_path)
+    }
+
+    #[tauri::command]
+    pub fn list_project_files_cmd(exts: Option<Vec<String>>) -> Result<Vec<ProjectEntry>, String> {
+        promptforge::list_project_files(exts)
+    }
+
+    #[tauri::command]
+    pub fn read_project_file_cmd(rel_path: String) -> Result<FileContent, String> {
+        promptforge::read_project_file(rel_path)
+    }
+
+    #[tauri::command]
+    pub fn write_project_file_cmd(rel_path: String, content: String) -> Result<String, String> {
+        promptforge::write_project_file(rel_path, content)
+    }
+
+    #[tauri::command]
+    pub fn load_txt_excerpt_cmd(
+        path: String,
+        max_bytes: Option<u64>,
+    ) -> Result<TxtExcerpt, String> {
+        promptforge::load_txt_excerpt(path, max_bytes)
+    }
+
+    #[tauri::command]
+    pub fn read_workspace_cmd(app: AppHandle) -> Result<Option<Workspace>, String> {
+        promptforge::read_workspace(&app)
+    }
+
+    #[tauri::command]
+    pub fn write_workspace_cmd(app: AppHandle, ws: Workspace) -> Result<String, String> {
+        promptforge::write_workspace(&app, ws)
+    }
+
+    #[tauri::command]
+    pub async fn check_ollama_setup_cmd(
+        base_url: Option<String>,
+        model: Option<String>,
+    ) -> Result<SetupCheckOutcome, String> {
+        promptforge::check_ollama_setup(base_url, model).await
+    }
+
+    pub fn apply_handlers(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
+        #[cfg(feature = "gtk4")]
+        {
+            builder.invoke_handler(tauri::generate_handler![
+                compose_prompt_cmd,
+                run_ollama_chat_cmd,
+                run_ollama_stream_cmd,
+                abort_current_stream_cmd,
+                save_run_cmd,
+                list_prompt_files_cmd,
+                read_prompt_file_cmd,
+                list_project_files_cmd,
+                read_project_file_cmd,
+                write_project_file_cmd,
+                load_txt_excerpt_cmd,
+                read_workspace_cmd,
+                write_workspace_cmd,
+                check_ollama_setup_cmd,
+            ])
+        }
+        #[cfg(not(feature = "gtk4"))]
+        {
+            builder.invoke_handler(tauri::generate_handler![
+                compose_prompt_cmd,
+                run_ollama_chat_cmd,
+                save_run_cmd,
+                list_prompt_files_cmd,
+                read_prompt_file_cmd,
+                list_project_files_cmd,
+                read_project_file_cmd,
+                write_project_file_cmd,
+                load_txt_excerpt_cmd,
+                read_workspace_cmd,
+                write_workspace_cmd,
+                check_ollama_setup_cmd,
+            ])
         }
     }
-
-    let params = serde_json::Value::Object(params_map);
-
-    // load fragments
-    let mut blocks: Vec<String> = vec![];
-    for frag_id in recipe.fragments.iter() {
-        let frag_path = sandbox
-            .join("fragments")
-            .join(format!("{}.yaml", frag_id.replace('.', "/")));
-        ensure_under(&sandbox, &frag_path)?;
-        let frag: Fragment = read_yaml(&frag_path)
-            .with_context(|| format!("Failed to read fragment: {}", frag_path.display()))?;
-        let rendered = render_placeholders(&frag.content, &params);
-        blocks.push(rendered);
-    }
-
-    let user_input = params
-        .get("user_input")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-
-    // final prompt with delimiter for user input
-    let final_prompt = format!(
-        "{}\n---\nUSER_INPUT (verbatim):\n```text\n{}\n```",
-        blocks.join("\n\n"),
-        user_input
-    );
-
-    // sha256
-    let mut hasher = Sha256::new();
-    hasher.update(final_prompt.as_bytes());
-    let sha256 = hex::encode(hasher.finalize());
-
-    Ok(ComposeResult {
-        final_prompt,
-        sha256,
-        model: recipe.profile,
-    })
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct ChatMessage {
-    role: String,
-    content: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct ChatPayload {
-    model: String,
-    stream: bool,
-    messages: Vec<ChatMessage>,
-}
-
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
-async fn run_ollama_chat(
-    model: String,
-    system_text: String,
-    user_text: String,
-) -> Result<String, String> {
-    let payload = ChatPayload {
-        model,
-        stream: false,
-        messages: vec![
-            ChatMessage {
-                role: "system".into(),
-                content: system_text,
-            },
-            ChatMessage {
-                role: "user".into(),
-                content: user_text,
-            },
-        ],
-    };
-
-    let client = reqwest::Client::new();
-    let res = client
-        .post("http://localhost:11434/api/chat")
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let txt = res.text().await.map_err(|e| e.to_string())?;
-    Ok(txt)
-}
-
-#[cfg(feature = "gtk4")]
-#[cfg_attr(feature = "gtk4", tauri::command)]
-async fn run_ollama_stream_impl(
-    window: tauri::Window,
-    state: &StreamState,
-    model: String,
-    system_text: String,
-    user_text: String,
-) -> Result<(), String> {
-    let payload = ChatPayload {
-        model,
-        stream: true,
-        messages: vec![
-            ChatMessage {
-                role: "system".into(),
-                content: system_text,
-            },
-            ChatMessage {
-                role: "user".into(),
-                content: user_text,
-            },
-        ],
-    };
-
-    let (handle, registration) = AbortHandle::new_pair();
-    let (stream_id, previous) = state.register(handle).await;
-    if let Some(prev) = previous {
-        prev.abort();
-    }
-
-    let state_for_task = state.clone();
-    let state_for_cleanup = state_for_task.clone();
-    let window_for_task = window.clone();
-
-    let task = async move {
-        let mut finished = false;
-        let mut buffer = String::new();
-        let mut raw_jsonl_lines: Vec<String> = Vec::new();
-        let send_result: Result<(), String> = async {
-            let client = reqwest::Client::new();
-            let response = client
-                .post("http://localhost:11434/api/chat")
-                .json(&payload)
-                .send()
-                .await
-                .map_err(|err| err.to_string())?;
-            let mut stream = response.bytes_stream();
-
-            let mut process_line = |raw: String| -> Result<(), String> {
-                if raw.trim().is_empty() {
-                    return Ok(());
-                }
-                match parse_ollama_jsonl_line(&raw) {
-                    Ok(parsed) => {
-                        raw_jsonl_lines.push(parsed.raw.clone());
-                        let mut done_triggered = false;
-                        let mut errored = false;
-                        let line_finished = emit_events_for_line(
-                            parsed,
-                            |jsonl| {
-                                let _ = window_for_task.emit("ollama:jsonl", jsonl);
-                            },
-                            |chunk| {
-                                let _ = window_for_task.emit("ollama:chunk", chunk);
-                            },
-                            || {
-                                done_triggered = true;
-                            },
-                            |msg| {
-                                errored = true;
-                                let _ = window_for_task.emit("ollama:error", msg);
-                            },
-                        );
-                        if done_triggered {
-                            finished = true;
-                            let aggregated = raw_jsonl_lines.join("");
-                            let _ = window_for_task.emit("ollama:end", aggregated);
-                        } else if errored || line_finished {
-                            finished = true;
-                        }
-                        Ok(())
-                    }
-                    Err(err) => Err(err.to_string()),
-                }
-            };
-
-            while let Some(item) = stream.next().await {
-                let bytes = item.map_err(|err| err.to_string())?;
-                buffer.push_str(&String::from_utf8_lossy(&bytes));
-                loop {
-                    if let Some(pos) = buffer.find('\n') {
-                        let chunk: String = buffer.drain(..=pos).collect();
-                        process_line(chunk)?;
-                    } else {
-                        break;
-                    }
-                }
-                if finished {
-                    break;
-                }
-            }
-
-            if !finished {
-                let remaining = buffer.clone();
-                if !remaining.trim().is_empty() {
-                    buffer.clear();
-                    process_line(remaining)?;
-                }
-            }
-            Ok(())
-        }
-        .await;
-
-        if let Err(err) = send_result {
-            let _ = window_for_task.emit("ollama:error", err);
-        }
-        state_for_task.clear_if(stream_id).await;
-    };
-
-    let abortable = Abortable::new(task, registration);
-    tauri::async_runtime::spawn(async move {
-        if abortable.await.is_err() {
-            state_for_cleanup.clear_if(stream_id).await;
-        }
-    });
-
-    Ok(())
-}
-
-// GTK4 関連コマンドの feature gate 一覧（docs/migration/tauri2-gtk4.md と同期）
-// - run_ollama_stream_impl: `#[cfg(feature = "gtk4")]` と `#[cfg_attr(feature = "gtk4", tauri::command)]`
-// - run_ollama_stream: `#[cfg_attr(feature = "gtk4", tauri::command)]` のみ。`#[cfg(feature = "gtk4")]` 付与が必要
-// - abort_current_stream: `#[cfg_attr(feature = "gtk4", tauri::command)]` のみ。`#[cfg(feature = "gtk4")]` 付与が必要
-// - workspace_path / read_workspace / write_workspace: `#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]` と対応する `#[cfg_attr(...)]`
-// - configure_builder: `#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]`
-#[cfg_attr(feature = "gtk4", tauri::command)]
-async fn run_ollama_stream(
-    window: tauri::Window,
-    state: tauri::State<'_, StreamState>,
-    model: String,
-    system_text: String,
-    user_text: String,
-) -> Result<(), String> {
-    run_ollama_stream_impl(window, state.inner(), model, system_text, user_text).await
-}
-
-#[cfg_attr(feature = "gtk4", tauri::command)]
-#[cfg(feature = "gtk4")] async fn abort_current_stream(
-    state: tauri::State<'_, StreamState>,
-) -> Result<(), String> {
-    if let Some(handle) = state.inner().take().await {
-        handle.abort();
-    }
-    Ok(())
-}
-
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
-fn save_run(
-    recipe_path: String,
-    final_prompt: String,
-    response_text: String,
-    response_jsonl: Option<String>,
-) -> Result<String, String> {
-    let ts = Local::now().format("%Y%m%d-%H%M%S").to_string();
-    let dir = PathBuf::from("runs").join(ts);
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-
-    fs::write(dir.join("recipe.path.txt"), recipe_path).map_err(|e| e.to_string())?;
-    fs::write(dir.join("prompt.final.txt"), final_prompt).map_err(|e| e.to_string())?;
-    let raw_payload = response_jsonl.unwrap_or_else(|| response_text.clone());
-    fs::write(dir.join("response.raw.jsonl"), raw_payload).map_err(|e| e.to_string())?;
-
-    Ok(dir.display().to_string())
-}
-
-// ---------- Sandbox helpers ----------
-fn ensure_under(base: &Path, target: &Path) -> Result<(), io::Error> {
-    let base = base.canonicalize()?;
-    let permission_error =
-        || io::Error::new(io::ErrorKind::PermissionDenied, "path out of sandbox");
-    match target.canonicalize() {
-        Ok(target) => {
-            if target.starts_with(&base) {
-                Ok(())
-            } else {
-                Err(permission_error())
-            }
-        }
-        Err(err) if err.kind() == io::ErrorKind::NotFound => {
-            let mut ancestor = target;
-            while let Some(parent) = ancestor.parent() {
-                match parent.canonicalize() {
-                    Ok(parent) => {
-                        if parent.starts_with(&base) {
-                            return Ok(());
-                        }
-                        return Err(permission_error());
-                    }
-                    Err(parent_err) if parent_err.kind() == io::ErrorKind::NotFound => {
-                        ancestor = parent;
-                        continue;
-                    }
-                    Err(parent_err) => return Err(parent_err),
-                }
-            }
-            Err(err)
-        }
-        Err(err) => Err(err),
-    }
-}
-
-// ---------- Prompt files ----------
-const PROMPT_KINDS: &[&str] = &["system", "task", "style", "constraints"];
-
-#[derive(Debug, Serialize)]
-pub struct PromptFileEntry {
-    pub path: String,
-    pub name: String,
-}
-
-fn normalize_prompt_kind(kind: String) -> Result<String, String> {
-    let kind = kind.to_lowercase();
-    if PROMPT_KINDS.contains(&kind.as_str()) {
-        Ok(kind)
-    } else {
-        Err("invalid prompt kind".into())
-    }
-}
-
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
-fn list_prompt_files(kind: String) -> Result<Vec<PromptFileEntry>, String> {
-    use walkdir::WalkDir;
-
-    let kind = normalize_prompt_kind(kind)?;
-    let root = PathBuf::from("prompts");
-    let base = root.join(&kind);
-    if !base.exists() {
-        return Ok(vec![]);
-    }
-    let mut out = vec![];
-    for entry in WalkDir::new(&base).into_iter().filter_map(|e| e.ok()) {
-        if !entry.file_type().is_file() {
-            continue;
-        }
-        let path = entry.path();
-        ensure_under(&root, path).map_err(|e| e.to_string())?;
-        let rel = path
-            .strip_prefix(&root)
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
-        let name = path.file_name().unwrap().to_string_lossy().to_string();
-        out.push(PromptFileEntry { path: rel, name });
-    }
-    out.sort_by(|a, b| a.path.cmp(&b.path));
-    Ok(out)
-}
-
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
-fn read_prompt_file(rel_path: String) -> Result<FileContent, String> {
-    let base = PathBuf::from("prompts");
-    let path = base.join(&rel_path);
-    ensure_under(&base, &path).map_err(|e| e.to_string())?;
-    if !path.exists() {
-        return Err("file not found".into());
-    }
-    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    Ok(FileContent {
-        path: path.display().to_string(),
-        content,
-    })
-}
-
-// ---------- Project file I/O ----------
-const PROJECT_ALLOWED_EXTS: &[&str] = &["py", "txt", "md", "json"];
-
-fn assert_allowed_project_ext(path: &Path) -> Result<(), String> {
-    let ext = path
-        .extension()
-        .and_then(|s| s.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    let is_allowed = PROJECT_ALLOWED_EXTS.iter().any(|allowed| ext == *allowed);
-    if is_allowed {
-        Ok(())
-    } else {
-        Err("unsupported extension".into())
-    }
-}
-
-#[derive(Debug, Serialize)]
-struct ProjectEntry {
-    path: String,
-    name: String,
-    size: u64,
-}
-
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
-fn list_project_files(exts: Option<Vec<String>>) -> Result<Vec<ProjectEntry>, String> {
-    use walkdir::WalkDir;
-    let base = PathBuf::from("project");
-    if !base.exists() {
-        fs::create_dir_all(&base).map_err(|e| e.to_string())?;
-    }
-    let mut out = vec![];
-    let allow_exts: Vec<String> = exts
-        .map(|v| v.into_iter().map(|s| s.to_lowercase()).collect())
-        .unwrap_or_else(|| PROJECT_ALLOWED_EXTS.iter().map(|s| s.to_string()).collect());
-    for e in WalkDir::new(&base).into_iter().filter_map(|e| e.ok()) {
-        if e.file_type().is_file() {
-            let p = e.path();
-            let ext = p
-                .extension()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_lowercase();
-            if !allow_exts.contains(&ext) {
-                continue;
-            }
-            let meta = fs::metadata(p).map_err(|e| e.to_string())?;
-            let rel = p.strip_prefix(&base).unwrap().to_string_lossy().to_string();
-            let name = p.file_name().unwrap().to_string_lossy().to_string();
-            out.push(ProjectEntry {
-                path: rel,
-                name,
-                size: meta.len(),
-            });
-        }
-    }
-    out.sort_by(|a, b| a.path.cmp(&b.path));
-    Ok(out)
-}
-
-#[derive(Debug, Serialize)]
-struct FileContent {
-    path: String,
-    content: String,
-}
-
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
-fn read_project_file(rel_path: String) -> Result<FileContent, String> {
-    let base = PathBuf::from("project");
-    let p = base.join(&rel_path);
-    assert_allowed_project_ext(&p)?;
-    if !p.exists() {
-        return Err("file not found".into());
-    }
-    ensure_under(&base, &p).map_err(|e| e.to_string())?;
-    let txt = fs::read_to_string(&p).map_err(|e| e.to_string())?;
-    Ok(FileContent {
-        path: p.display().to_string(),
-        content: txt,
-    })
-}
-
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
-fn write_project_file(rel_path: String, content: String) -> Result<String, String> {
-    let base = PathBuf::from("project");
-    let p = base.join(&rel_path);
-    assert_allowed_project_ext(&p)?;
-    if let Some(dir) = p.parent() {
-        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    }
-    ensure_under(&base, &p).map_err(|e| e.to_string())?;
-    fs::write(&p, content).map_err(|e| e.to_string())?;
-    Ok(p.display().to_string())
-}
-
-// ---------- Corpus excerpts ----------
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
-fn load_txt_excerpt(
-    path: String,
-    max_bytes: Option<u64>,
-) -> Result<txt_excerpt::TxtExcerpt, String> {
-    txt_excerpt::load_txt_excerpt(&path, max_bytes)
-}
-
-// ---------- Workspace persistence ----------
-#[derive(Debug, Serialize, Deserialize, Default)]
-struct Workspace {
-    version: u32,
-    left_text: String,
-    right_text: String,
-    recipe_path: String,
-    model: String,
-    params: serde_json::Value,
-    project_path: Option<String>,
-    updated_at: String,
-}
-
-#[cfg(all(test, any(feature = "gtk4", feature = "gtk4_compat")))]
-pub mod workspace_test_support {
-    pub use super::{workspace_path, write_workspace, Workspace};
-}
-
-#[cfg(all(test, any(feature = "gtk4", feature = "gtk4_compat")))]
-pub mod project_test_support {
-    pub use super::{read_project_file, write_project_file, FileContent};
-}
-
-#[cfg(all(test, any(feature = "gtk4", feature = "gtk4_compat")))]
-pub mod prompt_test_support {
-    pub use super::{list_prompt_files, read_prompt_file, FileContent, PromptFileEntry};
-}
-
-#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
-fn workspace_path(app: &tauri::AppHandle) -> PathBuf {
-    if let Some(mut p) = app.path_resolver().app_data_dir() {
-        p.push("workspace.json");
-        return p;
-    }
-    PathBuf::from("workspace.json")
-}
-
-#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
-fn read_workspace(app: tauri::AppHandle) -> Result<Option<Workspace>, String> {
-    let p = workspace_path(&app);
-    match fs::read_to_string(&p) {
-        Ok(s) => {
-            let ws: Workspace = serde_json::from_str(&s).map_err(|e| e.to_string())?;
-            Ok(Some(ws))
-        }
-        Err(err) => {
-            if err.kind() == std::io::ErrorKind::NotFound {
-                Ok(None)
-            } else {
-                Err(err.to_string())
-            }
-        }
-    }
-}
-
-#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
-#[cfg_attr(any(feature = "gtk4", feature = "gtk4_compat"), tauri::command)]
-fn write_workspace(app: tauri::AppHandle, ws: Workspace) -> Result<String, String> {
-    let p = workspace_path(&app);
-    if let Some(dir) = p.parent() {
-        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    }
-    let backup_path = p.with_file_name("workspace.bak");
-    let mut warning: Option<String> = None;
-    if p.exists() {
-        if let Err(err) = fs::copy(&p, &backup_path) {
-            warning = Some(format!("failed to create workspace backup: {}", err));
-        }
-    }
-    let s = serde_json::to_string_pretty(&ws).map_err(|e| e.to_string())?;
-    fs::write(&p, s).map_err(|e| e.to_string())?;
-    if let Some(warning) = warning {
-        Ok(format!("{} (warning: {})", p.display(), warning))
-    } else {
-        Ok(p.display().to_string())
-    }
-}
-
-#[cfg(all(any(feature = "gtk4", feature = "gtk4_compat"), target_os = "linux"))]
-#[allow(dead_code)]
-fn gtk4_widget_initialization_example() -> &'static str {
-    r#"use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Box as GtkBox, Orientation};
-
-fn main() {
-    let app = Application::builder()
-        .application_id("com.promptforge.app")
-        .build();
-
-    app.connect_activate(|app| {
-        let window = ApplicationWindow::builder()
-            .application(app)
-            .title("PromptForge")
-            .default_width(1150)
-            .default_height(820)
-            .build();
-
-        let root = GtkBox::new(Orientation::Vertical, 0);
-        window.set_content(Some(&root));
-        window.present();
-    });
-
-    app.run();
-}
-"#
-}
-
-#[cfg(all(any(feature = "gtk4", feature = "gtk4_compat"), target_os = "linux"))]
-fn apply_linux_overrides<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
-    // GTK4/Wayland では従来の X11 系ヒントが効かないため、明示設定は避ける
-    builder.setup(|_| {
-        let _ = gtk4_widget_initialization_example();
-        Ok(())
-    })
-}
-
-#[cfg(all(
-    any(feature = "gtk4", feature = "gtk4_compat"),
-    not(target_os = "linux")
-))]
-fn apply_linux_overrides<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
-    builder
-}
-
-#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
-pub fn configure_builder<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
-    let builder = apply_linux_overrides(builder);
-
-    builder
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_clipboard_manager::init())
-        .manage(StreamState::default())
-        .invoke_handler(tauri::generate_handler![
-            compose_prompt,
-            check_ollama_setup,
-            run_ollama_chat,
-            run_ollama_stream,
-            abort_current_stream,
-            save_run,
-            list_prompt_files,
-            read_prompt_file,
-            list_project_files,
-            read_project_file,
-            write_project_file,
-            load_txt_excerpt,
-            read_workspace,
-            write_workspace
-        ])
 }
 
 #[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]
 fn main() {
-    configure_builder(tauri::Builder::new())
+    commands::apply_handlers(promptforge::configure_builder(tauri::Builder::new()))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

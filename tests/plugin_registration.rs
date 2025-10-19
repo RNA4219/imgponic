@@ -1,5 +1,6 @@
 use promptforge::configure_builder;
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
+use tauri::Manager;
 
 fn build_app() -> tauri::App<MockRuntime> {
     configure_builder(mock_builder())
