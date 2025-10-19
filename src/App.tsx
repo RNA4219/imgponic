@@ -158,7 +158,15 @@ export const buildUnifiedDiff = (before: string, after: string): string => {
   if (before === after) {
     return ['--- 左', '+++ 右', '@@', '  (差分はありません)'].join('\n')
   }
-  return createTwoFilesPatch('左', '右', before, after, '', '', { context: 3 })
+  const patch = createTwoFilesPatch('左', '右', before, after, '', '', { context: 3 })
+  const lines = patch.split('\n')
+  if (lines.length > 0 && lines[0] === '===================================================================') {
+    lines.shift()
+  }
+  while (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop()
+  }
+  return lines.join('\n')
 }
 
 export const createDiffPreviewFlow = (callbacks: DiffPreviewCallbacks) => ({
@@ -205,52 +213,20 @@ export default function App() {
   const [leftSelection, setLeftSelection] = useState<string>('')
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
-  const responseBufferRef = useRef<string>('')
+  const streamedResponseRef = useRef<string>('')
   const updateLeftText = useCallback((value: string) => {
     setLeftText(value)
     setHasDangerWords(containsDangerWords(value))
   }, [])
 
-  const clearStreamedResponse = useCallback(
-    (options?: { preserveRightText?: boolean }) => {
-      responseBufferRef.current = ''
-      if (!options?.preserveRightText) {
-        setRightText('')
-      }
-    },
-    [setRightText]
-  )
+  const clearStreamedResponse = useCallback(() => {
+    setRightText('')
+  }, [])
 
-  const appendStreamChunk = useCallback(
-    (chunk: string) => {
-      responseBufferRef.current += chunk
-      setRightText(responseBufferRef.current)
-    },
-    [setRightText]
-  )
-
-  const handleStreamEnd = useCallback(() => {
-    setRunning(false)
-    const responseText = responseBufferRef.current
-    const latestComposed = composedRef.current
-    void (async () => {
-      if (latestComposed) {
-        try {
-          await invokeFn('save_run', {
-            recipePath,
-            final_prompt: latestComposed.final_prompt,
-            response_text: responseText
-          })
-        } catch (error) {
-          console.error('save_run failed', error)
-        }
-      }
-      clearStreamedResponse({ preserveRightText: true })
-    })()
-  }, [clearStreamedResponse, invokeFn, recipePath])
-
-  const handleStreamError = useCallback(
-    (message: string) => {
+  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
+    onChunk: chunk => setRightText(prev => prev + chunk),
+    onEnd: () => setRunning(false),
+    onError: message => {
       console.error('ollama stream error', message)
       setRunning(false)
       setOllamaError(describeOllamaError(message))
@@ -261,7 +237,9 @@ export default function App() {
 
   const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
     onChunk: appendStreamChunk,
-    onEnd: handleStreamEnd,
+    onEnd: () => {
+      void handleStreamEnd()
+    },
     onError: handleStreamError
   })
   const abortStream = useCallback(async () => {
