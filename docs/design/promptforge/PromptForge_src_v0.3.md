@@ -10,13 +10,14 @@
 
 ローカル環境で実行する**プロンプト合成＋整形ビューア**。  
 
-- 左ペイン：任意テキスト／コードを編集  
-- ▶ 実行：Ollamaで**System＋タスク的指示**に従い整形/要約/提案  
-- 右ペイン：結果表示 → **⇧ 反映**で左へ戻す  
+- 左ペイン：任意テキスト／コードを編集
+- ▶ 実行：Ollamaで**System＋タスク的指示**に従い整形/要約/提案（ストリーミング対応）
+- 右ペイン：結果表示 → **⇧ 反映**で左へ戻す（逐次追記）
 - **プロンプトはフォルダ管理**（System含む）  
 - **TXT簡易RAG**（長文は抜粋＋ハッシュ）  
 - **project/** 内の `.py/.txt/.md/.json` を**開く/保存**  
-- **ワークスペース自動保存/復元**（アプリ再起動後も状態維持）  
+- **ワークスペース自動保存/復元**（アプリ再起動後も状態維持）
+- **フォーカスモード**（片側全画面⇔2ペイン）と**選択送信**（前後3行＋概算トークンのプレビュー）
 - **Windowsは .bat 起動**、Docker不要
 
 > 将来的に：**コーデモッド（差分適用）/ ストリーミング / タブUI永続化 / Monaco** にスムーズ拡張。
@@ -57,26 +58,27 @@ data/
   profiles/  ... モデル設定プリセット
   recipes/   ... 合成レシピ（どのフラグメントを順に連結するか）
 
-prompts/       # すべてのプロンプト（System含む）を保存（初回起動時に作成）
-corpus/        # 簡易RAG対象の .txt（初回利用で作成）
-project/       # 編集対象の .py/.txt/.md/.json（サンドボックス）
+prompts/         # すべてのプロンプト（System含む）を保存（初回起動時に作成）
+corpus/          # 簡易RAG対象の .txt（初回利用で作成）
+project/         # 編集対象の .py/.txt/.md/.json（サンドボックス）
 
-runs/<ts>/     # 実行ログ（ストリーミング含む記録）
+runs/<ts>/       # 実行ログ（ストリーミング含む記録）
 src/
-  main.rs           # Tauri 2 エントリポイント（Rust側コマンド登録）
-  lib.rs            # Rustコマンド実装（compose/run/IO/Workspace）
-  ollama_stream.rs  # ストリーミング送信と中断制御
-  setup_check.rs    # Ollama疎通チェック
-  txt_excerpt.rs    # TXT抜粋処理
-  tests.rs          # Rust側ユーティリティテスト
-  main.tsx          # Reactエントリポイント
-  App.tsx           # 2ペインUIとツールバー
-  KeybindOverlay.tsx # ショートカットオーバーレイ
-  useOllamaStream.ts # ストリーミングhooks
-  useSetupCheck.ts  # 起動時のセットアップ確認
-  security/         # allowlist などの設定モジュール
-  app.css           # 共通スタイル
-scripts/*.bat  # Windows 起動/ビルド補助
+  main.rs             # Tauri 2 エントリポイント（`tauri::Builder` でコマンド登録）
+  lib.rs              # Rustコマンド実装（compose/run/IO/Workspace）
+  ollama_stream.rs    # ストリーミング送信と中断制御
+  setup_check.rs      # Ollama疎通チェック
+  txt_excerpt.rs      # TXT抜粋処理
+  tests.rs            # Rust側ユーティリティテスト
+  main.tsx            # Reactエントリポイント
+  App.tsx             # 2ペインUIとツールバー
+  KeybindOverlay.tsx  # ショートカットオーバーレイ（フォーカスモード含む）
+  useOllamaStream.ts  # ストリーミングhooks（停止/再開）
+  useSetupCheck.ts    # 起動時のセットアップ確認
+  app.css             # 共通スタイルとフォーカスモードテーマ
+  security/           # allowlist などの設定モジュール
+  test/setup.ts       # Vitest の JSDOM 初期化
+scripts/*.bat    # Windows 起動/ビルド補助
 ```
 
 ---
@@ -98,6 +100,7 @@ scripts/*.bat  # Windows 起動/ビルド補助
   - 左：テキスト入力（`textarea`）。選択範囲がある場合は送信対象とコンテキストがプレビューされる
   - 右：LLM整形出力（`textarea`、ストリーミングで逐次追記・**⇧ 反映**で左へコピー）
   - 各ペイン：**コピー**・**保存/別名保存**ボタン
+  - フォーカスモード：UIトグルまたはショートカットで片側全画面表示に切替、バッジに状態を表示
 
 ### 6.2 ショートカット
 
@@ -367,6 +370,7 @@ type Workspace = {
   入力・モデル・レシピ・パラメータ・`project_path` を800msデバウンスで
   `workspace.json` に書き出し
 - **停止**：`abort_current_stream` コマンドを叩き、現行ストリームを`AbortHandle`で破棄
+- **フォーカスモード**：`Ctrl/Cmd+Shift+F` またはツールバーのトグルで片側全画面⇔2ペインを切替。ステータスバッジとアニメーションで状態を通知
 
 ---
 
@@ -420,14 +424,21 @@ type Workspace = {
 
 ---
 
-## 16. 近未来拡張（優先順）
+## 16. 将来計画（ロードマップ整合）
 
-1) **タブUI**（名前/色/並べ替え/永続化）
-2) **差分モード**：右ペインを**Unified Diff**で出力 →
-   Rustで安全適用（失敗ハンクはスキップ）
-3) **Monaco Editor**：遅延ロード、Python/JSON/MDハイライト、折りたたみ
-4) **スキーマ固定整形**：JSONスキーマ検証→自動リトライ
-5) **RAGの要約パイプ**：スライディングウィンドウ→メタ要約→抽出リンク
+- **v0.4.1（進行中）**
+  1) **Workspace v2 / タブ永続化**：ULID管理・タブ名/色/並べ替えを Workspace v2 モデルで永続化
+  2) **差分プレビュー**：右ペインを Unified Diff 表示し、適用時は安全ハンクスキップで `project/` に反映
+  3) **機密マスク**：送信前に正規表現で機密トークンを検知し、自動マスク
+  4) **サイズ上限ハンドリング**：巨大入力時の段階トリミングと自動リトライ案内
+  5) **workspace.bak 強化**：バックアップ復元UIと RUNBOOK の検証手順を同期
+- **v0.4.2（整備フェーズ）**
+  - CIパイプライン拡張、Issueテンプレ更新、Docs整備、Diagnostics、Export/Import
+- **将来候補**
+  - **Monaco Editor**：遅延ロードと言語別ハイライト/フォールディング
+  - **RAG要約パイプライン強化**：スライディングウィンドウ→メタ要約→抽出リンク
+- **完了済み（注記）**
+  - **選択送信**：v0.4.0 で実装済み。前後3行プレビューと概算トークン表示を提供
 
 ---
 
