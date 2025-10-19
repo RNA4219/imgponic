@@ -3,8 +3,18 @@ name = "promptforge"
 version = "0.3.0"
 edition = "2021"
 
+[features]
+default = ["gtk4"]
+gtk4 = [
+    "dep:tauri",
+    "dep:tauri-plugin-fs",
+    "dep:tauri-plugin-dialog",
+    "dep:tauri-plugin-clipboard-manager",
+]
+gtk4_compat = []
+
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = [], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
@@ -16,9 +26,9 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 chrono = { version = "0.4", features = ["serde"] }
 walkdir = "2"
 futures-util = "0.3"
-tauri-plugin-fs = "2"
-tauri-plugin-dialog = "2"
-tauri-plugin-clipboard-manager = "2"
+tauri-plugin-fs = { version = "2", optional = true }
+tauri-plugin-dialog = { version = "2", optional = true }
+tauri-plugin-clipboard-manager = { version = "2", optional = true }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -30,6 +40,36 @@ tempfile = "3"
 [[test]]
 name = "glib_stack"
 path = "tests/security/glib_stack.rs"
+
+[[test]]
+name = "plugin_registration"
+path = "tests/plugin_registration.rs"
+required-features = ["gtk4"]
+
+[[test]]
+name = "workspace_backup"
+path = "tests/workspace_backup.rs"
+required-features = ["gtk4"]
+
+[[test]]
+name = "compose_prompt_snapshot"
+path = "tests/compose_prompt_snapshot.rs"
+required-features = ["gtk4"]
+
+[[test]]
+name = "project_file_io"
+path = "tests/project_file_io.rs"
+required-features = ["gtk4"]
+
+[[test]]
+name = "project_io"
+path = "tests/project_io.rs"
+required-features = ["gtk4"]
+
+[[test]]
+name = "prompt_files"
+path = "tests/prompt_files.rs"
+required-features = ["gtk4"]
 
 [patch.crates-io]
 tao = { git = "https://github.com/tauri-apps/tao", branch = "dev" }

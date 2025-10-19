@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use futures_util::future::{AbortHandle, Abortable};
+use futures_util::future::AbortHandle;
 use serde::Deserialize;
 use tokio::sync::Mutex;
 #[derive(Clone, Default)]
@@ -110,10 +110,10 @@ where
     }
     finished
 }
-#[cfg(test)]
+#[cfg(all(test, feature = "gtk4"))]
 mod tests {
     use super::*;
-    use futures_util::future::Aborted;
+    use futures_util::future::{Abortable, Aborted};
     use std::time::Duration;
 
     #[tokio::test]

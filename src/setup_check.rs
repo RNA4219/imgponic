@@ -164,7 +164,7 @@ pub async fn check_ollama_setup_state(
     }
 }
 
-#[tauri::command]
+#[cfg_attr(feature = "gtk4", tauri::command)]
 pub async fn check_ollama_setup(
     base_url: Option<String>,
     model: Option<String>,
