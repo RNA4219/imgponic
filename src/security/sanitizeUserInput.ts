@@ -37,16 +37,16 @@ export const sanitizeUserInput = (text: string): SanitizedUserInput => {
     return { sanitized: '', maskedTypes: [], overLimit: false }
   }
 
-  let sanitized = text
   const maskedTypes = new Set<SanitizedType>()
+  const applyMask = (value: string): string =>
+    MASK_PATTERNS.reduce((current, { type, regex }) => {
+      return current.replace(regex, () => {
+        maskedTypes.add(type)
+        return `<REDACTED:${type}>`
+      })
+    }, value)
 
-  for (const { type, regex } of MASK_PATTERNS) {
-    sanitized = sanitized.replace(regex, () => {
-      maskedTypes.add(type)
-      return `<REDACTED:${type}>`
-    })
-  }
-
+  const sanitized = applyMask(text)
   const overLimit = text.length > MAX_LENGTH
 
   return { sanitized, maskedTypes: Array.from(maskedTypes), overLimit }
