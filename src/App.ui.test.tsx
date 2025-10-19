@@ -398,6 +398,84 @@ domTest('uses ollama stream hook contract for run and stop controls', async () =
   }
 })
 
+domTest('startStream receives sanitized user text without prompt labels', async () => {
+  const startStream = vi.fn(async () => {})
+  const abortStream = vi.fn(async () => {})
+  const appendChunk = vi.fn()
+  const useOllamaStreamMock = vi.fn(() => ({
+    startStream,
+    abortStream,
+    appendChunk,
+    isStreaming: false
+  }))
+  const finalPrompt = [
+    'SYS instructions',
+    '---',
+    'USER_INPUT (verbatim):',
+    '```text',
+    'ここに入力。Ollama整形は右の▶で実行。',
+    '```'
+  ].join('\n')
+  const invokeMock = vi.fn(async (cmd: string, args?: Record<string, unknown>) => {
+    if (cmd === 'read_workspace') return null
+    if (cmd === 'write_workspace') return 'ok'
+    if (cmd === 'list_project_files') return []
+    if (cmd === 'compose_prompt') {
+      void args
+      return { final_prompt: finalPrompt, sha256: 'hash', model: 'm' }
+    }
+    if (cmd === 'run_ollama_stream') return undefined
+    if (cmd === 'save_run') return undefined
+    return undefined
+  })
+
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({
+      status: 'ready',
+      guidance: '',
+      retry: vi.fn(async () => {})
+    }),
+    useOllamaStream: useOllamaStreamMock,
+    invoke: invokeMock
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  try {
+    await act(async () => {
+      root.render(<App />)
+    })
+
+    const runButton = await waitForElement(
+      () =>
+        Array.from(container.querySelectorAll('button')).find(button =>
+          button.textContent?.includes('▶ 実行')
+        ) ?? null,
+      'run button'
+    )
+
+    await act(async () => {
+      runButton.click()
+      await Promise.resolve()
+    })
+
+    expect(startStream).toHaveBeenCalledTimes(1)
+    const callArgs = startStream.mock.calls[0]?.[0] as
+      | { systemText?: string; userText?: string }
+      | undefined
+    expect(callArgs?.systemText).toBe('SYS instructions')
+    expect(callArgs?.userText).toBe('ここに入力。Ollama整形は右の▶で実行。')
+    expect(callArgs?.userText ?? '').not.toContain('USER_INPUT')
+    expect(callArgs?.userText ?? '').not.toContain('```')
+  } finally {
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  }
+})
+
 domTest('Ctrl/Cmd+Shift+F toggles focus mode and reset button restores layout', async () => {
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({
