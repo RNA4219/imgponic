@@ -1,17 +1,23 @@
-import React from 'react'
+import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { expect, test } from 'vitest'
+import React from 'react'
 
 import KeybindOverlay, { KEYBIND_SHORTCUTS } from './KeybindOverlay'
 
-test('KEYBIND_SHORTCUTS にフォーカスモード切替ショートカットが含まれる', () => {
-  const entry = KEYBIND_SHORTCUTS.find(shortcut => shortcut.keys === 'Ctrl/Cmd+Shift+F')
-  expect(entry).toBeTruthy()
-  expect(entry?.description).toBe('フォーカスモードを切り替え（片側全画面⇔2ペイン）')
-})
+describe('KeybindOverlay shortcuts', () => {
+  const focusModeShortcut = {
+    keys: 'Ctrl/Cmd+Shift+F',
+    description: 'フォーカスモードを切り替え（片側全画面⇔2ペイン）'
+  }
 
-test('KeybindOverlay がフォーカスモード切替ショートカットを表示する', () => {
-  const markup = renderToStaticMarkup(<KeybindOverlay open onClose={() => {}} />)
-  expect(markup).toContain('Ctrl/Cmd+Shift+F')
-  expect(markup).toContain('フォーカスモードを切り替え（片側全画面⇔2ペイン）')
+  it('defines the focus mode toggle shortcut in KEYBIND_SHORTCUTS', () => {
+    expect(KEYBIND_SHORTCUTS).toContainEqual(focusModeShortcut)
+  })
+
+  it('renders the focus mode toggle shortcut when open', () => {
+    const html = renderToStaticMarkup(<KeybindOverlay open onClose={() => {}} />)
+
+    expect(html).toContain(focusModeShortcut.keys)
+    expect(html).toContain(focusModeShortcut.description)
+  })
 })
