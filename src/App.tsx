@@ -224,8 +224,6 @@ export default function App() {
   const [leftSelection, setLeftSelection] = useState<string>('')
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
-  const streamedResponseRef = useRef<string>('')
-  const streamedJsonlRef = useRef<string>('')
   const hasSavedRunRef = useRef<boolean>(false)
   const updateLeftText = useCallback((value: string) => {
     setLeftText(value)
@@ -233,8 +231,6 @@ export default function App() {
   }, [])
 
   const clearStreamedResponse = useCallback((options?: { markSaved?: boolean }) => {
-    streamedResponseRef.current = ''
-    streamedJsonlRef.current = ''
     hasSavedRunRef.current = options?.markSaved ?? false
     setRightText('')
   }, [])
@@ -242,13 +238,9 @@ export default function App() {
   const streamHandlers = useMemo(
     () => ({
       onChunk: (chunk: string) => {
-        streamedResponseRef.current += chunk
         setRightText(prev => prev + chunk)
       },
-      onJsonl: (jsonl: string) => {
-        streamedJsonlRef.current += jsonl
-      },
-      onEnd: async () => {
+      onEnd: async ({ raw }) => {
         setRunning(false)
         if (hasSavedRunRef.current) return
         hasSavedRunRef.current = true
@@ -256,8 +248,8 @@ export default function App() {
           await invokeFn<string>('save_run', {
             recipePath,
             final_prompt: composedRef.current?.final_prompt ?? '',
-            response_jsonl: streamedJsonlRef.current,
-            response_text: streamedResponseRef.current
+            response_jsonl: raw,
+            response_text: raw
           })
         } catch (error) {
           console.error('save_run failed', error)

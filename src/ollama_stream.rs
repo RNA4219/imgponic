@@ -77,6 +77,39 @@ pub fn parse_ollama_jsonl_line(raw_line: &str) -> Result<ParsedOllamaLine, serde
         events,
     })
 }
+
+pub fn emit_events_for_line<FJsonl, FChunk, FDone, FError>(
+    parsed: ParsedOllamaLine,
+    mut emit_jsonl: FJsonl,
+    mut emit_chunk: FChunk,
+    mut emit_done: FDone,
+    mut emit_error: FError,
+) -> bool
+where
+    FJsonl: FnMut(String),
+    FChunk: FnMut(String),
+    FDone: FnMut(),
+    FError: FnMut(String),
+{
+    emit_jsonl(parsed.raw.clone());
+    let mut finished = false;
+    for event in parsed.events {
+        match event {
+            OllamaEvent::Chunk(chunk) => emit_chunk(chunk),
+            OllamaEvent::Done => {
+                emit_done();
+                finished = true;
+                break;
+            }
+            OllamaEvent::Error(err) => {
+                emit_error(err);
+                finished = true;
+                break;
+            }
+        }
+    }
+    finished
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,5 +186,45 @@ mod tests {
         let parsed_done = parse_ollama_jsonl_line(r#"{"done":true}\n"#).unwrap();
         assert_eq!(parsed_done.raw, r#"{"done":true}\n"#);
         assert_eq!(parsed_done.events, vec![OllamaEvent::Done]);
+    }
+
+    #[test]
+    fn emit_events_forwards_jsonl_before_events() {
+        let parsed = ParsedOllamaLine {
+            raw: "{\"response\":\"Hi\",\"done\":true}\n".into(),
+            events: vec![OllamaEvent::Chunk("Hi".into()), OllamaEvent::Done],
+        };
+        let mut jsonl_payloads = Vec::new();
+        let mut emitted_events = Vec::new();
+        let finished = emit_events_for_line(
+            parsed,
+            |raw| jsonl_payloads.push(raw),
+            |chunk| emitted_events.push(format!("chunk:{chunk}")),
+            || emitted_events.push("done".into()),
+            |err| emitted_events.push(format!("error:{err}")),
+        );
+        assert!(finished);
+        assert_eq!(
+            jsonl_payloads,
+            vec!["{\"response\":\"Hi\",\"done\":true}\n".to_string()]
+        );
+        assert_eq!(
+            emitted_events,
+            vec!["chunk:Hi".to_string(), "done".to_string()]
+        );
+
+        let parsed_error = ParsedOllamaLine {
+            raw: "{\"error\":\"boom\"}\n".into(),
+            events: vec![OllamaEvent::Error("boom".into())],
+        };
+        let finished_error = emit_events_for_line(
+            parsed_error,
+            |_| {},
+            |_| unreachable!(),
+            || unreachable!(),
+            |err| emitted_events.push(format!("error:{err}")),
+        );
+        assert!(finished_error);
+        assert_eq!(emitted_events.last(), Some(&"error:boom".to_string()));
     }
 }
