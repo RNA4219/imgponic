@@ -313,6 +313,72 @@ domTest('renders setup guidance banner when offline and retries on demand', asyn
   container.remove()
 })
 
+domTest('masks preview for over-limit secret input', async () => {
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({
+      status: 'ready',
+      guidance: '',
+      retry: vi.fn(async () => {})
+    }),
+    useOllamaStream: () => ({
+      ...noopStream
+    }),
+    invoke: async (cmd: string) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  try {
+    await act(async () => {
+      root.render(<App />)
+    })
+
+    const leftTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="left"]'),
+      'left textarea'
+    )
+
+    const secret = 'api_key: ' + 'Z'.repeat(64)
+    const filler = 'x'.repeat(40010)
+    const nextValue = `${secret}\n${filler}`
+
+    await act(async () => {
+      leftTextarea.value = nextValue
+      leftTextarea.dispatchEvent(new window.Event('input', { bubbles: true }))
+    })
+
+    await flushEffects()
+
+    const limitBadge = await waitForElement(
+      () => container.querySelector('[data-testid="limit-warning"]'),
+      'limit warning badge'
+    )
+    expect(limitBadge).toBeInstanceOf(HTMLElement)
+
+    const preview = await waitForElement(
+      () => container.querySelector('details pre'),
+      'preview pre'
+    )
+    expect(preview).toBeInstanceOf(HTMLElement)
+    const previewText = preview.textContent ?? ''
+    expect(previewText).toContain('<REDACTED:API_KEY>')
+    expect(previewText).not.toContain('Z'.repeat(32))
+  } finally {
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  }
+})
+
 domTest('renders setup guidance banner when model is missing', async () => {
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({
