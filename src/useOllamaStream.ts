@@ -23,13 +23,13 @@ export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
   const handlerRef = useRef(handlers)
   const unlistenRef = useRef<UnlistenFn[] | null>(null)
   const streamingRef = useRef(false)
-  const rawJsonlRef = useRef('')
+  const rawJsonlRef = useRef<string[]>([])
 
   useEffect(() => { handlerRef.current = handlers }, [handlers])
 
   const appendChunk = useCallback((chunk: string) => handlerRef.current.onChunk?.(chunk), [])
   const appendJsonl = useCallback((jsonl: string) => {
-    rawJsonlRef.current += jsonl
+    rawJsonlRef.current.push(jsonl)
     handlerRef.current.onJsonl?.(jsonl)
   }, [])
 
@@ -46,11 +46,11 @@ export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
     setIsStreaming(false)
     void clearListeners()
     if (kind === 'end') {
-      const result = { raw: rawJsonlRef.current }
-      rawJsonlRef.current = ''
+      const result = { raw: rawJsonlRef.current.join('') }
+      rawJsonlRef.current = []
       handlerRef.current.onEnd?.(result)
     } else {
-      rawJsonlRef.current = ''
+      rawJsonlRef.current = []
       handlerRef.current.onError?.(reason instanceof Error ? reason.message : String(reason ?? ''))
     }
   }, [clearListeners])
@@ -59,7 +59,7 @@ export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
     if (streamingRef.current) return
     streamingRef.current = true
     setIsStreaming(true)
-    rawJsonlRef.current = ''
+    rawJsonlRef.current = []
     const unlisteners: UnlistenFn[] = []
     const window = getCurrentWindow()
     const register = async (name: string, cb: (event: unknown) => void) =>

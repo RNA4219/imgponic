@@ -227,4 +227,24 @@ mod tests {
         assert!(finished_error);
         assert_eq!(emitted_events.last(), Some(&"error:boom".to_string()));
     }
+
+    #[test]
+    fn emit_events_returns_false_when_stream_continues() {
+        let parsed = ParsedOllamaLine {
+            raw: "{\"response\":\"Hi\"}\n".into(),
+            events: vec![OllamaEvent::Chunk("Hi".into())],
+        };
+        let mut jsonl_payloads = Vec::new();
+        let mut chunks = Vec::new();
+        let finished = emit_events_for_line(
+            parsed,
+            |raw| jsonl_payloads.push(raw),
+            |chunk| chunks.push(chunk),
+            || panic!("unexpected done"),
+            |_| panic!("unexpected error"),
+        );
+        assert!(!finished);
+        assert_eq!(jsonl_payloads, vec!["{\"response\":\"Hi\"}\n".to_string()]);
+        assert_eq!(chunks, vec!["Hi".to_string()]);
+    }
 }
