@@ -273,25 +273,30 @@ async fn run_ollama_stream(
                 }
                 match parse_ollama_jsonl_line(&raw) {
                     Ok(parsed) => {
-                        let ended = emit_events_for_line(
-                            parsed,
-                            |payload| {
-                                let _ = window_for_task.emit("ollama:jsonl", payload);
-                            },
-                            |text| {
-                                let _ = window_for_task.emit("ollama:chunk", text);
-                            },
-                            || {
-                                finished = true;
-                                let _ = window_for_task.emit("ollama:end", ());
-                            },
-                            |msg| {
-                                finished = true;
-                                let _ = window_for_task.emit("ollama:error", msg);
-                            },
-                        );
-                        if ended {
-                            finished = true;
+                        let ParsedOllamaLine {
+                            raw: parsed_raw,
+                            events,
+                        } = parsed;
+                        let emit_payload = parsed_raw.clone();
+                        _raw_lines.push(parsed_raw);
+                        let _ = window_for_task.emit("ollama:jsonl", emit_payload);
+                        for event in events {
+                            match event {
+                                OllamaEvent::Chunk(text) => {
+                                    let _ = window_for_task.emit("ollama:chunk", text);
+                                }
+                                OllamaEvent::Done => {
+                                    finished = true;
+                                    let _ = window_for_task.emit("ollama:end", ());
+                                }
+                                OllamaEvent::Error(msg) => {
+                                    finished = true;
+                                    let _ = window_for_task.emit("ollama:error", msg);
+                                }
+                            }
+                            if finished {
+                                break;
+                            }
                         }
                         Ok(())
                     }
@@ -685,7 +690,7 @@ pub fn configure_builder<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri
 }
 
 fn main() {
-    configure_builder(tauri::Builder::default())
+    configure_builder(tauri::Builder::new())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
