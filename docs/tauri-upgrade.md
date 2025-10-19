@@ -140,3 +140,18 @@ failed to select a version for `tauri` which could resolve this conflict
 
 ## 2025-10-19 `cargo fmt --all` 実行ログ
 - 結果: 成功（差分なし）
+
+## 2025-10-19 追加メモ（glib 0.18 系ロック再確認）
+- `rustup update stable` と `cargo install cargo-audit --locked` / `cargo install cargo-deny --locked` を実行し、ツールチェーンを Rust 1.90.0・監査ツール最新版へ更新。【d7ce33†L1-L6】【d5d59e†L1-L4】【17a04b†L1-L3】
+- `cargo test --test glib_stack --features security` は `glib-sys v0.18.1` がシステムの `glib-2.0 >= 2.70` を要求してビルドスクリプトが失敗し、`tests/security/glib_stack.rs` の `glib >= 0.20.0` アサーション確認には至らず（GTK3 ランタイム未導入が原因）。【fee476†L1-L29】
+- `Cargo.lock` の `glib = 0.18.5` / `gtk = 0.18.2` 参照は依然として残存し、`glib` 0.20 系へは未更新。【7f6109†L8-L18】【27e6ea†L8-L14】
+
+### 参考ログ
+```text
+$ cargo test --test glib_stack --features security
+...
+warning: glib-sys@0.18.1:
+error: failed to run custom build command for `glib-sys v0.18.1`
+...
+The system library `glib-2.0` required by crate `glib-sys` was not found.
+```
