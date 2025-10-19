@@ -34,6 +34,9 @@ const resolveInvokeFn = (): typeof invoke => selectAppMocks().invoke ?? invoke
 export type ComposeResult = { final_prompt: string; sha256: string; model: string }
 type InvokeFunction = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
+const USER_INPUT_SECTION_PATTERN = /\n---\nUSER_INPUT[^\n]*\n/
+const CODE_FENCE_PATTERN = /^```[^\n]*\n([\s\S]*?)\n?```$/
+
 type DocExcerpt = {
   path: string
   excerpt: string
@@ -446,45 +449,6 @@ export default function App() {
     return res
   }, [invokeFn, params, recipePath, leftText, sendSelectionOnly, leftSelection, leftSelectionStart, leftSelectionEnd])
 
-  // 実行（▶）
-  const runOllama = useCallback(async () => {
-    if (isStreaming) return
-    resetOllamaError()
-    setRunning(true)
-    clearStreamedResponse()
-    try {
-      const c = composed ?? await doCompose()
-      const sep = '\n---\nUSER_INPUT'
-      const at = c.final_prompt.indexOf(sep)
-      const sys = at < 0 ? c.final_prompt : c.final_prompt.slice(0, at)
-      const user = at < 0 ? '' : c.final_prompt.slice(at)
-
-      await startStream({
-        model: ollamaModel,
-        systemText: sys,
-        userText: user
-      })
-    } catch (error) {
-      console.error('run ollama stream failed', error)
-      setRunning(false)
-      setOllamaError(describeOllamaError(error))
-    }
-  }, [isStreaming, composed, doCompose, startStream, ollamaModel, clearStreamedResponse, resetOllamaError])
-
-  // 右→左 反映（プレビュー付き）
-  const diffFlow = useMemo(
-    () =>
-      createDiffPreviewFlow({
-        readLeft: () => leftText,
-        readRight: () => rightText,
-        show: value => setDiffPatch(value),
-        apply: value => updateLeftText(value),
-        close: () => setDiffPatch(null)
-      }),
-    [leftText, rightText, updateLeftText]
-  )
-  const { open: openDiffPreview, confirm: confirmDiffPreview, cancel: cancelDiffPreview } = diffFlow
-
   const rawUserInput = useMemo(
     () => determineUserInput(sendSelectionOnly, leftSelection, leftText, leftSelectionStart, leftSelectionEnd, 3),
     [sendSelectionOnly, leftSelection, leftText, leftSelectionStart, leftSelectionEnd]
@@ -513,6 +477,61 @@ export default function App() {
   useEffect(() => {
     setUserInputWarnings({ maskedTypes: sanitization.maskedTypes, overLimit: sanitization.overLimit })
   }, [sanitization])
+
+  // 実行（▶）
+  const runOllama = useCallback(async () => {
+    if (isStreaming) return
+    resetOllamaError()
+    setRunning(true)
+    clearStreamedResponse()
+    try {
+      const c = composed ?? await doCompose()
+      const match = USER_INPUT_SECTION_PATTERN.exec(c.final_prompt)
+      const systemText = match ? c.final_prompt.slice(0, match.index) : c.final_prompt
+      const userSection = match
+        ? c.final_prompt.slice(match.index + match[0].length)
+        : ''
+      const strippedUserSection = (() => {
+        const withoutLeading = userSection.replace(/^[\s\uFEFF\u200B]+/, '')
+        const fenceMatch = withoutLeading.match(CODE_FENCE_PATTERN)
+        return fenceMatch ? fenceMatch[1] : withoutLeading
+      })()
+      const userText = sanitization.sanitized || strippedUserSection
+
+      await startStream({
+        model: ollamaModel,
+        systemText,
+        userText
+      })
+    } catch (error) {
+      console.error('run ollama stream failed', error)
+      setRunning(false)
+      setOllamaError(describeOllamaError(error))
+    }
+  }, [
+    isStreaming,
+    composed,
+    doCompose,
+    startStream,
+    ollamaModel,
+    clearStreamedResponse,
+    resetOllamaError,
+    sanitization
+  ])
+
+  // 右→左 反映（プレビュー付き）
+  const diffFlow = useMemo(
+    () =>
+      createDiffPreviewFlow({
+        readLeft: () => leftText,
+        readRight: () => rightText,
+        show: value => setDiffPatch(value),
+        apply: value => updateLeftText(value),
+        close: () => setDiffPatch(null)
+      }),
+    [leftText, rightText, updateLeftText]
+  )
+  const { open: openDiffPreview, confirm: confirmDiffPreview, cancel: cancelDiffPreview } = diffFlow
 
   const handleLeftSelection = useCallback((target: HTMLTextAreaElement) => {
     const { selectionStart, selectionEnd, value } = target
