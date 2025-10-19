@@ -13,6 +13,8 @@ next_review_due: 2025-11-14
 - **Local**
   - **前提ツール**: Node.js 20 LTS（`node --version`）、npm、Rust stable (`rustup show active-toolchain`)、Cargo。
     `npm install` で導入される `@tauri-apps/cli`（`npx tauri --help` で確認）。
+    セキュリティ検査用に `cargo-audit --version`・`cargo-deny --version` で導入済みか確認し、
+    未導入なら `cargo install cargo-audit --locked` / `cargo install cargo-deny --locked` を実行する。
   - **起動サービス**: Ollama を `ollama serve` で常駐させ、`ollama pull llama3:8b` でモデル取得後に
     `http://localhost:11434/api/tags` が 200 を返すことを確認（Windows は `scripts/check-ollama.bat` を利用）。
   - **環境変数**: `PROMPTFORGE_DATA_DIR` を設定すると `data/` サンドボックスのルートを差し替え可能
