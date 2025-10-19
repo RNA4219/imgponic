@@ -78,6 +78,8 @@ Rust/React 開発用に GTK/WebKit のビルドチェーンをそろえるには
 
 > フォールバックは Ubuntu/Debian, Fedora, Arch Linux で検出可能なパッケージ名を対象にしています。必要に応じて各ディストロの WebKit パッケージ提供状況を確認してください。
 
+Arch Linux 系では `libsoup3` への移行（`libsoup-3.0.pc` 提供を想定）が必須です。
+
 ---
 
 ## ✨ 主な機能

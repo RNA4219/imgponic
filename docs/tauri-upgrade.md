@@ -2,6 +2,13 @@
 
 調査日時: 2025-10-19
 
+## 2025-02-XX cargo audit 警告メモ
+
+| Crate | RUSTSEC | 状態 | 暫定対応策 |
+| ----- | ------- | ---- | ----------- |
+| `atk` / `atk-sys` / `gtk3-macros` / `proc-macro-error` | 2024-0413 / 2024-0416 / 2024-0419 / 2024-0370 | GTK3 系クレートが非メンテ保守。 `tauri` → `wry` → `gtk` 依存で伝播。 | GTK4 移行待ち。`wry`/`tao` の GTK4 対応ブランチがリリースされ次第、`tauri` 側の semver 更新を追従し `cargo update -p wry -p tao -p gtk` を実行する。進捗は [tauri-apps/tauri#12563](https://github.com/tauri-apps/tauri/issues/12563) を継続監視。|
+| `fxhash` | 2025-0057 | `kuchikiki` → `selectors` 連鎖で非メンテ保守。 | `wry` speedreader の HTML parser 置き換え待ち。上流の [tauri-apps/wry#1609](https://github.com/tauri-apps/wry/issues/1609) の完了後、`cargo update -p wry` を実行して解消を確認。 interim では `cargo audit --deny warnings` を CI に追加し再発防止。|
+
 ## 候補ブランチ・フォーク一覧
 
 | 対象 | 上流 | ref | 最新コミット | 対応 WebKit | 備考 |
@@ -59,6 +66,22 @@ Patch `wry v0.50.5 (https://github.com/conradhale/wry?rev=fdce27aca03b79682cb777
 - `cargo clippy --all-targets --all-features -- -D warnings` を実行したところ、`tauri` に `gtk4` feature が存在せず依存関係の解決に失敗。
 - `Cargo.toml` では `gtk4` feature が `tauri/gtk4` を要求しているが、現在公開されている `tauri v2.8.5` には該当 feature が未実装のため解消不可。
 - `tauri` 側で `gtk4` feature を提供するブランチ公開待ち。既存の `[patch.crates-io]` 設定でも feature は追加されていないことを確認した。
+
+### 参考ログ
+```
+error: failed to select a version for `tauri`.
+    ... required by package `promptforge v0.3.0 (/workspace/imgponic)`
+versions that meet the requirements `^2` (locked to 2.8.5) are: 2.8.5
+
+package `promptforge` depends on `tauri` with feature `gtk4` but `tauri` does not have that feature.
+
+
+failed to select a version for `tauri` which could resolve this conflict
+```
+
+## 2025-02-15 試行メモ
+- `cargo test --all-features --workspace` を実行したところ、`tauri` の `gtk4` feature が存在しないため依存関係の解決に失敗。
+- 実行ログを `target/test.log` に保存済み。エラー内容は `tauri` が `gtk4` feature を提供していない点で、`promptforge` の依存関係が満たせなかった。
 
 ### 参考ログ
 ```
