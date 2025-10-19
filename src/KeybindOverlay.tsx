@@ -18,11 +18,12 @@ export const FOCUS_MODE_SHORTCUT: KeybindShortcut = {
 }
 
 export const KEYBIND_SHORTCUTS: KeybindShortcut[] = [
-  { keys: 'Ctrl/Cmd+Enter', description: 'LLM実行（左入力を整形）' },
+  { keys: 'Ctrl/Cmd+Enter', description: '現在の左ペイン内容を実行（▶）' },
   { keys: 'Ctrl/Cmd+S', description: '左ペインのテキストを project/ に保存' },
-  { keys: 'Ctrl/Cmd+C', description: '右ペインの生成結果をコピー' },
+  { keys: 'Ctrl/Cmd+C', description: '右ペインの生成結果をコピー（フォーカス中のペインを優先）' },
   FOCUS_MODE_SHORTCUT,
-  { keys: '? / Esc', description: 'ショートカット早見表の表示／閉じる' }
+  { keys: '?', description: 'キーバインドオーバーレイの表示／非表示' },
+  { keys: 'Esc', description: 'キーバインドオーバーレイを閉じる' }
 ]
 
 type KeybindOverlayProps = { open: boolean; onClose: () => void }
