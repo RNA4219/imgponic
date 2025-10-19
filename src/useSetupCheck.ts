@@ -65,7 +65,6 @@ export type UseSetupCheckResult = SetupState & {
 
 export const useSetupCheck = (currentModel: string): UseSetupCheckResult => {
   const [state, setState] = useState<SetupState>({ status: 'ok', guidance: '' })
-  const hasRun = useRef(false)
 
   const runCheck = useCallback(async () => {
     try {
@@ -77,10 +76,7 @@ export const useSetupCheck = (currentModel: string): UseSetupCheckResult => {
   }, [currentModel])
 
   useEffect(() => {
-    if (!hasRun.current) {
-      hasRun.current = true
-      void runCheck()
-    }
+    void runCheck()
   }, [runCheck])
 
   const retry = useCallback(async () => {
