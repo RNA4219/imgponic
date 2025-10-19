@@ -51,6 +51,18 @@ describe('sanitizeUserInput', () => {
     expect(result.maskedTypes).toEqual(['AWS_ACCESS_KEY'])
   })
 
+  it('keeps overLimit true while returning masked secrets for long input', () => {
+    const googleKey = `AIza${'A'.repeat(35)}`
+    const longText = `${'x'.repeat(MAX_LENGTH)}${googleKey}`
+
+    const result = sanitizeUserInput(longText)
+
+    expect(result.overLimit).toBe(true)
+    expect(result.sanitized).toContain('<REDACTED:GOOGLE_API_KEY>')
+    expect(result.sanitized).not.toContain(googleKey)
+    expect(result.maskedTypes).toEqual(['GOOGLE_API_KEY'])
+  })
+
   it('preserves overLimit while redacting secrets beyond the maximum length', () => {
     const secret = 'AKIA1234567890ABCDEF'
     const longText = `${'x'.repeat(MAX_LENGTH)}${secret}`

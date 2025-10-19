@@ -117,16 +117,17 @@ export const composePromptWithSelection = async (
 ): Promise<ComposeResult> => {
   const rawUserInput = determineUserInput(sendSelectionOnly, selection, leftText, selectionStart, selectionEnd, contextRadius)
   const sanitizedResult = sanitizeUserInput(rawUserInput)
+  const sanitizedText = sanitizedResult.sanitized
   const sanitizedSnapshot: SanitizedSnapshot = {
     raw: rawUserInput,
-    sanitized: sanitizedResult.sanitized,
+    sanitized: sanitizedText,
     maskedTypes: sanitizedResult.maskedTypes,
     overLimit: sanitizedResult.overLimit
   }
   onSanitized?.(sanitizedSnapshot)
   const res = await invokeFn('compose_prompt', {
     recipePath,
-    inlineParams: { ...params, user_input: sanitizedSnapshot.sanitized }
+    inlineParams: { ...params, user_input: sanitizedText }
   })
   return res as ComposeResult
 }
@@ -234,7 +235,7 @@ export default function App() {
     setRightText('')
   }, [])
 
-  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook(
+  useOllamaStreamHook(
     {
       onChunk: chunk => setRightText(prev => prev + chunk),
       onEnd: () => setRunning(false),

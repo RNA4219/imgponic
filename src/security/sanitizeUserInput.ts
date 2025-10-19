@@ -46,8 +46,8 @@ export const sanitizeUserInput = (text: string): SanitizedUserInput => {
       })
     }, value)
 
-  const sanitized = applyMask(text)
   const overLimit = text.length > MAX_LENGTH
+  const maskedText = applyMask(text)
 
-  return { sanitized, maskedTypes: Array.from(maskedTypes), overLimit }
+  return { sanitized: maskedText, maskedTypes: Array.from(maskedTypes), overLimit }
 }

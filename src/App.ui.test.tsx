@@ -849,6 +849,56 @@ test('composePromptWithSelection uses masked text even when sanitizeUserInput re
   }
 })
 
+test('composePromptWithSelection forwards masked text when sanitizeUserInput exceeds the limit', async () => {
+  const filler = 'x'.repeat(100)
+  const rawSelection = `${filler}super secret`
+  const maskedValue = '<REDACTED:AWS_SECRET_KEY>'
+  const sanitizeSpy = vi.spyOn(sanitizeModule, 'sanitizeUserInput').mockReturnValue({
+    sanitized: maskedValue,
+    maskedTypes: ['AWS_SECRET_KEY'],
+    overLimit: true
+  })
+
+  try {
+    const invokeFn = vi.fn(async (_cmd: string, args?: Record<string, unknown>) => ({
+      final_prompt: 'fp',
+      sha256: 'hash',
+      model: 'model'
+    }))
+    let snapshot: { sanitized: string; maskedTypes: string[]; overLimit: boolean; raw: string } | null = null
+
+    await composePromptWithSelection({
+      invokeFn,
+      params: { temperature: 0 },
+      recipePath: 'recipe.yaml',
+      leftText: rawSelection,
+      sendSelectionOnly: true,
+      selection: rawSelection,
+      selectionStart: 0,
+      selectionEnd: rawSelection.length,
+      contextRadius: 3,
+      onSanitized: value => {
+        snapshot = value
+      }
+    })
+
+    expect(sanitizeSpy).toHaveBeenCalledTimes(1)
+    const expectedRaw = determineUserInput(true, rawSelection, rawSelection, 0, rawSelection.length, 3)
+    expect(invokeFn).toHaveBeenCalledTimes(1)
+    const invokeArgs = invokeFn.mock.calls[0] as [string, { inlineParams: Record<string, unknown> }]
+    expect(invokeArgs[0]).toBe('compose_prompt')
+    expect(invokeArgs[1].inlineParams.user_input).toBe(maskedValue)
+    expect(snapshot).not.toBeNull()
+    const nonNullSnapshot = snapshot as NonNullable<typeof snapshot>
+    expect(nonNullSnapshot.raw).toBe(expectedRaw)
+    expect(nonNullSnapshot.sanitized).toBe(maskedValue)
+    expect(nonNullSnapshot.overLimit).toBe(true)
+    expect(nonNullSnapshot.maskedTypes).toEqual(['AWS_SECRET_KEY'])
+  } finally {
+    sanitizeSpy.mockRestore()
+  }
+})
+
 test('diff preview requires approval before applying', () => {
   let left = 'line1\nleft'
   const right = 'line1\nright'
