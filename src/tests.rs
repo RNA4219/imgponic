@@ -358,4 +358,19 @@ mod ollama_stream_integration {
         );
         assert_eq!(aggregated, format!("{}{}", expected_first, expected_second));
     }
+
+    #[tokio::test]
+    async fn run_ollama_stream_propagates_complete_jsonl_history() {
+        let expected_lines = vec![
+            "{\"response\":\"uno \",\"done\":false}\n".to_string(),
+            "{\"response\":\"dos\",\"done\":false}\n".to_string(),
+            "{\"done\":true}".to_string(),
+        ];
+
+        let (jsonl_lines, aggregated) = collect_stream(expected_lines.clone(), 3).await;
+
+        assert_eq!(jsonl_lines, expected_lines);
+        let replay = jsonl_lines.concat();
+        assert_eq!(aggregated, replay);
+    }
 }

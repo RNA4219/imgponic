@@ -12,19 +12,21 @@ export const resolveKeybindOverlayState = (current: boolean, event: KeyboardLike
 
 export type KeybindShortcut = { keys: string; description: string }
 
+const FOCUS_MODE_DESCRIPTION = 'フォーカスモードを切り替え（片側全画面⇔2ペイン）'
+
 export const FOCUS_MODE_SHORTCUT: KeybindShortcut = {
   keys: 'Ctrl/Cmd+Shift+F',
-  description: 'フォーカスモードを切り替え（片側全画面⇔2ペイン）'
+  description: FOCUS_MODE_DESCRIPTION
 }
 
-export const KEYBIND_SHORTCUTS: KeybindShortcut[] = [
+export const KEYBIND_SHORTCUTS = [
   { keys: 'Ctrl/Cmd+Enter', description: '現在の左ペイン内容を実行（▶）' },
   { keys: 'Ctrl/Cmd+S', description: '左ペインのテキストを project/ に保存' },
   { keys: 'Ctrl/Cmd+C', description: '右ペインの生成結果をコピー（フォーカス中のペインを優先）' },
   FOCUS_MODE_SHORTCUT,
   { keys: '?', description: 'キーバインドオーバーレイの表示／非表示' },
   { keys: 'Esc', description: 'キーバインドオーバーレイを閉じる' }
-]
+] satisfies readonly KeybindShortcut[]
 
 type KeybindOverlayProps = { open: boolean; onClose: () => void }
 
