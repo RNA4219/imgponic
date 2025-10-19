@@ -66,6 +66,20 @@ ollama pull llama3:8b
 
 ---
 
+## 🐧 Linux セットアップ
+
+Rust/React 開発用に GTK/WebKit のビルドチェーンをそろえるには、以下を実行してください。
+
+1. `./scripts/install-gtk4-webkit6-dev.sh`
+   - まず WebKitGTK 6.0 系パッケージ（例: `libwebkitgtk-6.0-dev`）の有無をディストロごとに確認します。
+   - 見つからない場合は 4.1 系（例: `libwebkit2gtk-4.1-dev`, `libjavascriptcoregtk-4.1-dev`, `libsoup-3.0-dev`）へ自動フォールバックします。
+2. `tools/ci/assert-gtk-stack.sh`
+   - `pkg-config --exists webkitgtk-6.0` が失敗した際は `webkit2gtk-4.1` を許容し、いずれも無い場合にのみエラーで終了します。
+
+> フォールバックは Ubuntu/Debian, Fedora, Arch Linux で検出可能なパッケージ名を対象にしています。必要に応じて各ディストロの WebKit パッケージ提供状況を確認してください。
+
+---
+
 ## ✨ 主な機能
 
 - **レシピ合成**：テンプレ片（フラグメント）を順に連結し、`{key}` を展開

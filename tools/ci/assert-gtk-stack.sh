@@ -7,10 +7,14 @@ if ! pkg-config --exists gtk4; then
   exit 1
 fi
 
-# Ensure WebKit6 development files are available.
-if ! pkg-config --exists webkitgtk-6.0; then
-  echo "error: webkitgtk-6.0 development files are not available via pkg-config" >&2
+# Ensure WebKit development files are available (prefer 6.0, allow 4.1 fallback).
+if pkg-config --exists webkitgtk-6.0; then
+  webkit_pkg="webkitgtk-6.0"
+elif pkg-config --exists webkit2gtk-4.1; then
+  webkit_pkg="webkit2gtk-4.1"
+else
+  echo "error: neither webkitgtk-6.0 nor webkit2gtk-4.1 development files are available via pkg-config" >&2
   exit 1
 fi
 
-echo "GTK4/WebKit6 stack check passed: gtk4 and webkitgtk-6.0 detected."
+echo "GTK4/WebKit stack check passed: gtk4 and ${webkit_pkg} detected."
