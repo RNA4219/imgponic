@@ -188,6 +188,7 @@ export default function App() {
   const INITIAL_LEFT_TEXT = 'ここに入力。Ollama整形は右の▶で実行。'
   const [leftText, setLeftText] = useState<string>(INITIAL_LEFT_TEXT)
   const [rightText, setRightText] = useState<string>('（ここに整形結果が出ます）')
+  const [focusTarget, setFocusTarget] = useState<'left' | 'right' | null>(null)
   const [hasDangerWords, setHasDangerWords] = useState<boolean>(() => containsDangerWords(INITIAL_LEFT_TEXT))
   const [focusedPanel, setFocusedPanel] = useState<'left' | 'right' | null>(null)
 
@@ -229,19 +230,40 @@ export default function App() {
   }, [])
 
   const clearStreamedResponse = useCallback(() => {
+    streamedResponseRef.current = ''
     setRightText('')
   }, [])
 
-  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
-    onChunk: chunk => setRightText(prev => prev + chunk),
-    onEnd: () => setRunning(false),
-    onError: message => {
+  const appendStreamChunk = useCallback((chunk: string) => {
+    streamedResponseRef.current = `${streamedResponseRef.current}${chunk}`
+    setRightText(streamedResponseRef.current)
+  }, [])
+
+  const handleStreamEnd = useCallback(async () => {
+    setRunning(false)
+    const composedSnapshot = composedRef.current
+    const responseText = streamedResponseRef.current
+    if (!composedSnapshot || !responseText) return
+    try {
+      await invokeFn('save_run', {
+        recipePath,
+        final_prompt: composedSnapshot.final_prompt,
+        response_text: responseText,
+        model: composedSnapshot.model
+      })
+    } catch (error) {
+      console.warn('save_run failed', error)
+    }
+  }, [invokeFn, recipePath])
+
+  const handleStreamError = useCallback(
+    (message: string) => {
       console.error('ollama stream error', message)
       setRunning(false)
       setOllamaError(describeOllamaError(message))
       clearStreamedResponse()
     },
-    [clearStreamedResponse, setOllamaError]
+    [clearStreamedResponse]
   )
 
   const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
@@ -447,7 +469,14 @@ export default function App() {
     [sendSelectionOnly, leftSelection, leftText, leftSelectionStart, leftSelectionEnd]
   )
   const sanitization = useMemo(() => sanitizeUserInput(rawUserInput), [rawUserInput])
-  const sanitizedPreview = sanitization.overLimit ? rawUserInput : sanitization.sanitized
+  const sanitizedPreview = useMemo(() => {
+    const base = sanitization.sanitized
+    if (!sanitization.overLimit) {
+      return base
+    }
+    const MAX_PREVIEW_LENGTH = 40000
+    return base.length > MAX_PREVIEW_LENGTH ? base.slice(0, MAX_PREVIEW_LENGTH) : base
+  }, [sanitization])
   const [userInputWarnings, setUserInputWarnings] = useState<{ maskedTypes: string[]; overLimit: boolean }>(() => ({
     maskedTypes: sanitization.maskedTypes,
     overLimit: sanitization.overLimit
@@ -554,6 +583,20 @@ export default function App() {
       if (mod && e.key.toLowerCase() === 'c') {
         e.preventDefault()
         copy(rightText)
+      }
+      if (mod && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setFocusTarget(prev => {
+          const activeElement = typeof document !== 'undefined' ? document.activeElement : null
+          const activeSide = (() => {
+            if (!activeElement || !(activeElement instanceof HTMLElement)) return null
+            const side = activeElement.getAttribute('data-side')
+            return side === 'left' || side === 'right' ? side : null
+          })()
+          const nextTarget = activeSide ?? prev ?? 'left'
+          return prev === nextTarget ? null : nextTarget
+        })
+        return
       }
 
       let preventOverlayToggle = false
@@ -783,6 +826,15 @@ export default function App() {
           <h3>
             <span>入力</span>
             <span className="toolbar">
+              <button
+                type="button"
+                className={`btn${focusTarget === 'left' ? ' primary' : ''}`}
+                data-testid="focus-toggle-left"
+                aria-pressed={focusTarget === 'left'}
+                onClick={() => setFocusTarget(prev => (prev === 'left' ? null : 'left'))}
+              >
+                {focusTarget === 'left' ? 'フォーカス解除' : '集中'}
+              </button>
               <button className="btn" onClick={() => writeText(leftText)}>コピー</button>
               <button className="btn" onClick={() => saveAs('left.txt', leftText)}>別名保存</button>
               <button
@@ -817,6 +869,15 @@ export default function App() {
           <h3>
             <span>LLM（整形出力）</span>
             <span className="toolbar">
+              <button
+                type="button"
+                className={`btn${focusTarget === 'right' ? ' primary' : ''}`}
+                data-testid="focus-toggle-right"
+                aria-pressed={focusTarget === 'right'}
+                onClick={() => setFocusTarget(prev => (prev === 'right' ? null : 'right'))}
+              >
+                {focusTarget === 'right' ? 'フォーカス解除' : '集中'}
+              </button>
               <button className="btn" onClick={openDiffPreview}>⇧ 反映</button>
               <button className="btn" onClick={() => writeText(rightText)}>コピー</button>
               <button className="btn" onClick={() => saveAs('right.txt', rightText)}>別名保存</button>
