@@ -398,6 +398,96 @@ domTest('uses ollama stream hook contract for run and stop controls', async () =
   }
 })
 
+domTest('re-composes prompt after editing left pane', async () => {
+  type StartStreamOptions = Parameters<ReturnType<UseOllamaStreamFn>['startStream']>[0]
+  let capturedHandlers: Parameters<UseOllamaStreamFn>[0] | null = null
+  const startStream = vi.fn(async (options: StartStreamOptions) => {
+    await capturedHandlers?.onEnd?.({ raw: '' })
+  })
+  const abortStream = vi.fn(async () => {})
+  const appendChunk = vi.fn()
+  const useOllamaStreamMock = ((handlers: Parameters<UseOllamaStreamFn>[0]) => {
+    capturedHandlers = handlers
+    return {
+      startStream: async (options: StartStreamOptions) => {
+        await startStream(options)
+      },
+      abortStream,
+      appendChunk,
+      isStreaming: false
+    }
+  }) as UseOllamaStreamFn
+  const composeArgs: Array<Record<string, unknown> | undefined> = []
+  const composeResults: Array<{ final_prompt: string; sha256: string; model: string }> = [
+    { final_prompt: 'SYS\n---\nUSER_INPUT initial', sha256: 'hash-initial', model: 'model' },
+    { final_prompt: 'SYS\n---\nUSER_INPUT updated', sha256: 'hash-updated', model: 'model' }
+  ]
+  const invokeMock = vi.fn(async (cmd: string, args?: Record<string, unknown>) => {
+    if (cmd === 'read_workspace') return null
+    if (cmd === 'write_workspace') return 'ok'
+    if (cmd === 'list_project_files') return []
+    if (cmd === 'compose_prompt') {
+      composeArgs.push(args)
+      const index = composeArgs.length - 1
+      return composeResults[index] ?? composeResults[composeResults.length - 1]
+    }
+    if (cmd === 'save_run') return undefined
+    return undefined
+  })
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),
+    useOllamaStream: useOllamaStreamMock,
+    invoke: invokeMock
+  }
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+  try {
+    await act(async () => {
+      root.render(<App />)
+    })
+    const runButton = await waitForElement(
+      () =>
+        Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('▶ 実行')) ?? null,
+      'run button'
+    )
+    await act(async () => {
+      runButton.click()
+      await Promise.resolve()
+    })
+    await flushEffects()
+    expect(composeArgs.filter(Boolean)).toHaveLength(1)
+    expect(startStream.mock.calls).toHaveLength(1)
+    const leftTextarea = container.querySelector('textarea[data-side="left"]')
+    expect(leftTextarea).toBeInstanceOf(HTMLTextAreaElement)
+    if (!(leftTextarea instanceof HTMLTextAreaElement)) throw new Error('Expected left textarea')
+    leftTextarea.value = 'updated input text'
+    leftTextarea.selectionStart = leftTextarea.value.length
+    leftTextarea.selectionEnd = leftTextarea.value.length
+    leftTextarea.dispatchEvent(new domInstance.window.Event('input', { bubbles: true }))
+    await flushEffects()
+    await act(async () => {
+      runButton.click()
+      await Promise.resolve()
+    })
+    await flushEffects()
+    const composeCalls = composeArgs.filter(Boolean)
+    expect(composeCalls).toHaveLength(2)
+    const inlineParams = (composeCalls[1] as { inlineParams?: Record<string, unknown> })?.inlineParams
+    if (!inlineParams || typeof inlineParams !== 'object') {
+      throw new Error('Expected inlineParams to be an object')
+    }
+    expect(inlineParams.user_input).toContain('updated input text')
+    expect(startStream.mock.calls).toHaveLength(2)
+    const secondRunOptions = startStream.mock.calls[1]?.[0] as { userText?: string } | undefined
+    expect((secondRunOptions?.userText ?? '')).toContain('USER_INPUT updated')
+  } finally {
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  }
+})
+
 domTest('Ctrl/Cmd+Shift+F toggles focus mode and reset button restores layout', async () => {
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({
