@@ -92,6 +92,36 @@ package `promptforge` depends on `tauri` with feature `gtk4` but `tauri` does no
 failed to select a version for `tauri` which could resolve this conflict
 ```
 
+## 2025-10-20: clippy失敗（glib-2.0 開発パッケージ不足）→ 対処
+
+- 症状: `glib-sys` の `pkg-config` 解決で失敗し `cargo clippy --all-targets --all-features -D warnings` が落ちる。
+- 原因: Linux ビルド前提の dev パッケージ（glib-2.0, gtk4, webkitgtk-6.0, libsoup-3.0 他）が未導入。
+- 対処:
+  1. `scripts/install-gtk4-webkit6-dev.sh` を実行（ディストロ自動判別）。
+  2. `cargo update -p glib -p gtk4 -p webkit6 || true`
+  3. `cargo clippy --all-targets --all-features -- -D warnings` を再実行しグリーンを確認。
+- 備考: CI でも同スクリプトを実行するよう `.github/workflows/rust.yml` を更新済み。
+
+## 2025-02-16 試行メモ
+- `cargo clippy --all-targets --all-features -- -D warnings` を実行したが、`glib-sys` のビルドがシステムライブラリ不足で失敗。
+- `pkg-config` が `glib-2.0` を検出できず、`tools/pkg-config-webkit.sh` により `glib-2.0 >= 2.70` を要求するが CI コンテナには未導入。
+- `PKG_CONFIG_PATH` を設定しても `.pc` が存在しないため、glib の開発パッケージを追加インストールするまで解消不可。
+
+### 参考ログ
+```
+warning: glib-sys@0.18.1:
+error: failed to run custom build command for `glib-sys v0.18.1`
+
+Caused by:
+  process didn't exit successfully: `/workspace/imgponic/target/debug/build/glib-sys-53465d8c3377f131/build-script-build` (exit status: 1)
+  --- stdout
+  cargo:warning=
+  pkg-config exited with status code 1
+  > PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1 /workspace/imgponic/tools/pkg-config-webkit.sh --libs --cflags glib-2.0 'glib-2.0 >= 2.70'
+
+  The system library `glib-2.0` required by crate `glib-sys` was not found.
+```
+
 ## 2025-02-15 試行メモ
 - `cargo test --all-features --workspace` を実行したところ、`tauri` の `gtk4` feature が存在しないため依存関係の解決に失敗。
 - 実行ログを `target/test.log` に保存済み。エラー内容は `tauri` が `gtk4` feature を提供していない点で、`promptforge` の依存関係が満たせなかった。
