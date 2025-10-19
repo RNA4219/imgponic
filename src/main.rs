@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::{Emitter, Manager};
 
-use crate::ollama_stream::{parse_ollama_jsonl_chunk, OllamaEvent, StreamState};
+use crate::ollama_stream::{parse_ollama_jsonl_line, OllamaEvent, ParsedOllamaLine, StreamState};
 use crate::setup_check::check_ollama_setup;
 
 #[derive(Debug, Deserialize)]
@@ -257,6 +257,7 @@ async fn run_ollama_stream(
     let task = async move {
         let mut finished = false;
         let mut buffer = String::new();
+        let mut _raw_lines: Vec<String> = Vec::new();
         let send_result: Result<(), String> = async {
             let client = reqwest::Client::new();
             let response = client
@@ -267,12 +268,16 @@ async fn run_ollama_stream(
                 .map_err(|err| err.to_string())?;
             let mut stream = response.bytes_stream();
 
-            let mut process_line = |line: &str| -> Result<(), String> {
-                if line.trim().is_empty() {
+            let mut process_line = |raw: String| -> Result<(), String> {
+                if raw.trim().is_empty() {
                     return Ok(());
                 }
-                match parse_ollama_jsonl_chunk(line) {
-                    Ok(events) => {
+                match parse_ollama_jsonl_line(&raw) {
+                    Ok(parsed) => {
+                        let ParsedOllamaLine { raw: parsed_raw, events } = parsed;
+                        let emit_payload = parsed_raw.clone();
+                        _raw_lines.push(parsed_raw);
+                        let _ = window_for_task.emit("ollama:jsonl", emit_payload);
                         for event in events {
                             match event {
                                 OllamaEvent::Chunk(text) => {
@@ -303,8 +308,7 @@ async fn run_ollama_stream(
                 loop {
                     if let Some(pos) = buffer.find('\n') {
                         let chunk: String = buffer.drain(..=pos).collect();
-                        let line = chunk.trim_end_matches(['\r', '\n']);
-                        process_line(line)?;
+                        process_line(chunk)?;
                     } else {
                         break;
                     }
@@ -314,8 +318,12 @@ async fn run_ollama_stream(
                 }
             }
 
-            if !finished && !buffer.trim().is_empty() {
-                process_line(buffer.trim_end())?;
+            if !finished {
+                let remaining = buffer.clone();
+                if !remaining.trim().is_empty() {
+                    buffer.clear();
+                    process_line(remaining)?;
+                }
             }
             Ok(())
         }
@@ -350,6 +358,7 @@ fn save_run(
     recipe_path: String,
     final_prompt: String,
     response_text: String,
+    response_jsonl: Option<String>,
 ) -> Result<String, String> {
     let ts = Local::now().format("%Y%m%d-%H%M%S").to_string();
     let dir = PathBuf::from("runs").join(ts);
@@ -357,7 +366,8 @@ fn save_run(
 
     fs::write(dir.join("recipe.path.txt"), recipe_path).map_err(|e| e.to_string())?;
     fs::write(dir.join("prompt.final.txt"), final_prompt).map_err(|e| e.to_string())?;
-    fs::write(dir.join("response.raw.jsonl"), response_text).map_err(|e| e.to_string())?;
+    let raw_payload = response_jsonl.unwrap_or_else(|| response_text.clone());
+    fs::write(dir.join("response.raw.jsonl"), raw_payload).map_err(|e| e.to_string())?;
 
     Ok(dir.display().to_string())
 }

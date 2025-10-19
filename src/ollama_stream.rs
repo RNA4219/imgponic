@@ -48,6 +48,12 @@ pub enum OllamaEvent {
     Done,
     Error(String),
 }
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParsedOllamaLine {
+    pub raw: String,
+    pub events: Vec<OllamaEvent>,
+}
 pub fn parse_ollama_jsonl_chunk(line: &str) -> Result<Vec<OllamaEvent>, serde_json::Error> {
     let chunk: OllamaChunk = serde_json::from_str(line)?;
     if let Some(err) = chunk.error {
@@ -61,6 +67,15 @@ pub fn parse_ollama_jsonl_chunk(line: &str) -> Result<Vec<OllamaEvent>, serde_js
         events.push(OllamaEvent::Done);
     }
     Ok(events)
+}
+
+pub fn parse_ollama_jsonl_line(raw_line: &str) -> Result<ParsedOllamaLine, serde_json::Error> {
+    let trimmed = raw_line.trim_end_matches(['\r', '\n']);
+    let events = parse_ollama_jsonl_chunk(trimmed)?;
+    Ok(ParsedOllamaLine {
+        raw: raw_line.to_string(),
+        events,
+    })
 }
 #[cfg(test)]
 mod tests {
@@ -127,5 +142,16 @@ mod tests {
         ] {
             assert_eq!(parse_ollama_jsonl_chunk(input).unwrap(), expected);
         }
+    }
+
+    #[test]
+    fn parse_line_preserves_raw_payload() {
+        let parsed = parse_ollama_jsonl_line(r#"{"response":"Hel"}"#).unwrap();
+        assert_eq!(parsed.raw, r#"{"response":"Hel"}"#);
+        assert_eq!(parsed.events, vec![OllamaEvent::Chunk("Hel".into())]);
+
+        let parsed_done = parse_ollama_jsonl_line(r#"{"done":true}\n"#).unwrap();
+        assert_eq!(parsed_done.raw, r#"{"done":true}\n"#);
+        assert_eq!(parsed_done.events, vec![OllamaEvent::Done]);
     }
 }

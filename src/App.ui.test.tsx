@@ -1718,6 +1718,7 @@ domTest('defers save_run until stream completion without duplicate start', async
           streaming = true
           api.isStreaming = true
           handlers?.onChunk?.('alpha ')
+          handlers?.onJsonl?.('{"response":"alpha ","done":false}\n')
           await new Promise<void>(resolve => {
             resolveStream = () => {
               streaming = false
@@ -1746,7 +1747,10 @@ domTest('defers save_run until stream completion without duplicate start', async
     await act(async () => { runButton.click(); await Promise.resolve() })
     await flushEffects()
     expect(startCalls).toBe(1); expect(saveRunCalls).toHaveLength(0)
-    await act(async () => { capturedHandlers?.onChunk?.('beta') })
+    await act(async () => {
+      capturedHandlers?.onChunk?.('beta')
+      capturedHandlers?.onJsonl?.('{"response":"beta","done":true}\n')
+    })
     await flushEffects()
     expect(startCalls).toBe(1); expect(saveRunCalls).toHaveLength(0)
 
@@ -1757,6 +1761,7 @@ domTest('defers save_run until stream completion without duplicate start', async
       {
         recipePath: 'data/recipes/demo.sora2.yaml',
         final_prompt: 'SYS\n---\nUSER_INPUT',
+        response_jsonl: '{"response":"alpha ","done":false}\n{"response":"beta","done":true}\n',
         response_text: 'alpha beta'
       }
     ])
@@ -1764,5 +1769,61 @@ domTest('defers save_run until stream completion without duplicate start', async
     expect(rightTextarea).toBeInstanceOf(HTMLTextAreaElement); expect(rightTextarea?.value).toBe('alpha beta')
   } finally {
     await act(async () => { root.unmount() }); container.remove()
+  }
+})
+
+domTest('aggregates raw jsonl lines before invoking save_run', async () => {
+  let capturedHandlers: Parameters<UseOllamaStreamFn>[0] | null = null
+  const saveRunCalls: Array<Record<string, unknown>> = []
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),
+    invoke: async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'save_run') { saveRunCalls.push(args ?? {}); return 'ok' }
+      return undefined
+    },
+    useOllamaStream: handlers => {
+      capturedHandlers = handlers
+      return {
+        startStream: async () => {},
+        abortStream: async () => {},
+        appendChunk: chunk => handlers?.onChunk?.(chunk),
+        isStreaming: true
+      }
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  try {
+    await act(async () => { root.render(<App />) })
+    const runButton = container.querySelector('.runpulse') as HTMLButtonElement | null
+    if (!runButton) throw new Error('Expected run button')
+
+    await act(async () => { runButton.click(); await Promise.resolve() })
+    expect(saveRunCalls).toHaveLength(0)
+
+    await act(async () => {
+      capturedHandlers?.onJsonl?.('{"response":"alpha"}\n')
+      capturedHandlers?.onJsonl?.('{"response":"beta","done":true}')
+    })
+    expect(saveRunCalls).toHaveLength(0)
+
+    await act(async () => { capturedHandlers?.onEnd?.() })
+    expect(saveRunCalls).toEqual([
+      {
+        recipePath: 'data/recipes/demo.sora2.yaml',
+        final_prompt: 'SYS\n---\nUSER_INPUT',
+        response_jsonl: '{"response":"alpha"}\n{"response":"beta","done":true}',
+        response_text: ''
+      }
+    ])
+  } finally {
+    await act(async () => { root.unmount() })
+    container.remove()
   }
 })
