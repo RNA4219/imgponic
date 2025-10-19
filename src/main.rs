@@ -354,6 +354,12 @@ async fn run_ollama_stream_impl(
     Ok(())
 }
 
+// GTK4 関連コマンドの feature gate 一覧（docs/migration/tauri2-gtk4.md と同期）
+// - run_ollama_stream_impl: `#[cfg(feature = "gtk4")]` と `#[cfg_attr(feature = "gtk4", tauri::command)]`
+// - run_ollama_stream: `#[cfg_attr(feature = "gtk4", tauri::command)]` のみ。`#[cfg(feature = "gtk4")]` 付与が必要
+// - abort_current_stream: `#[cfg_attr(feature = "gtk4", tauri::command)]` のみ。`#[cfg(feature = "gtk4")]` 付与が必要
+// - workspace_path / read_workspace / write_workspace: `#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]` と対応する `#[cfg_attr(...)]`
+// - configure_builder: `#[cfg(any(feature = "gtk4", feature = "gtk4_compat"))]`
 #[cfg_attr(feature = "gtk4", tauri::command)]
 async fn run_ollama_stream(
     window: tauri::Window,
@@ -365,7 +371,6 @@ async fn run_ollama_stream(
     run_ollama_stream_impl(window, state.inner(), model, system_text, user_text).await
 }
 
-#[cfg(feature = "gtk4")]
 #[cfg_attr(feature = "gtk4", tauri::command)]
 async fn abort_current_stream(state: tauri::State<'_, StreamState>) -> Result<(), String> {
     if let Some(handle) = state.inner().take().await {
