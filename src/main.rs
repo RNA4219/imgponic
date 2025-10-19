@@ -372,7 +372,9 @@ async fn run_ollama_stream(
 }
 
 #[cfg_attr(feature = "gtk4", tauri::command)]
-async fn abort_current_stream(state: tauri::State<'_, StreamState>) -> Result<(), String> {
+#[cfg(feature = "gtk4")] async fn abort_current_stream(
+    state: tauri::State<'_, StreamState>,
+) -> Result<(), String> {
     if let Some(handle) = state.inner().take().await {
         handle.abort();
     }
