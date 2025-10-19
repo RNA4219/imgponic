@@ -313,6 +313,87 @@ domTest('renders setup guidance banner when offline and retries on demand', asyn
   container.remove()
 })
 
+domTest('Ctrl/Cmd+Shift+F toggles focus mode and reset button restores layout', async () => {
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({
+      status: 'ready',
+      guidance: '',
+      retry: vi.fn(async () => {})
+    }),
+    useOllamaStream: () => ({
+      ...noopStream
+    }),
+    invoke: async (cmd: string) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  try {
+    await act(async () => {
+      root.render(<App />)
+    })
+
+    const split = await waitForElement(() => container.querySelector('.split'), 'split layout')
+    expect(split?.classList.contains('focus-left')).toBe(false)
+    expect(split?.classList.contains('focus-right')).toBe(false)
+
+    const leftTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="left"]'),
+      'left textarea'
+    )
+
+    await act(async () => {
+      leftTextarea.focus()
+    })
+
+    const dispatchToggle = async () => {
+      const event = new KeyboardEvent('keydown', { key: 'F', ctrlKey: true, shiftKey: true, bubbles: true })
+      window.dispatchEvent(event)
+      await flushEffects()
+    }
+
+    await dispatchToggle()
+
+    expect(split?.classList.contains('focus-left')).toBe(true)
+    const rightPanel = container.querySelector('[data-panel="right"]') as HTMLElement | null
+    expect(rightPanel?.style.display).toBe('none')
+
+    const resetButton = await waitForElement(
+      () => container.querySelector('[data-testid="focus-mode-exit"]') as HTMLButtonElement | null,
+      'focus mode exit button'
+    )
+
+    await act(async () => {
+      resetButton.click()
+    })
+    await flushEffects()
+
+    expect(split?.classList.contains('focus-left')).toBe(false)
+    expect(split?.classList.contains('focus-right')).toBe(false)
+    expect(rightPanel?.style.display).toBe('')
+
+    await dispatchToggle()
+    expect(split?.classList.contains('focus-left')).toBe(true)
+
+    await dispatchToggle()
+    expect(split?.classList.contains('focus-left')).toBe(false)
+    expect(split?.classList.contains('focus-right')).toBe(false)
+  } finally {
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  }
+})
+
 domTest('renders setup guidance banner when model is missing', async () => {
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({
@@ -456,6 +537,79 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
   } finally {
     consoleError.mockRestore()
     await act(async () => { root.unmount() })
+    container.remove()
+  }
+})
+
+domTest('masks over-limit preview with sanitized text', async () => {
+  const secret = 'ABCDEFGHIJKLMNOPQRSTUVWX0123456789'
+  const payload = `${'x'.repeat(40020)}\napi_key = "${secret}"\n`
+
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({
+      status: 'ready',
+      guidance: '',
+      retry: vi.fn(async () => {})
+    }),
+    useOllamaStream: () => ({
+      startStream: async () => {},
+      abortStream: async () => {},
+      appendChunk: () => {},
+      isStreaming: false
+    }),
+    invoke: async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') {
+        return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  try {
+    await act(async () => {
+      root.render(<App />)
+    })
+
+    const leftTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="left"]'),
+      'left textarea'
+    )
+    if (!(leftTextarea instanceof HTMLTextAreaElement)) {
+      throw new Error('Expected left textarea')
+    }
+
+    await act(async () => {
+      leftTextarea.value = payload
+      leftTextarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await flushEffects()
+
+    const previewDetails = container.querySelector('details')
+    expect(previewDetails).toBeInstanceOf(HTMLElement)
+    if (!(previewDetails instanceof HTMLElement)) {
+      throw new Error('Expected preview details')
+    }
+    previewDetails.setAttribute('open', '')
+
+    await flushEffects()
+
+    const previewPre = previewDetails.querySelector('pre')
+    expect(previewPre).toBeInstanceOf(HTMLElement)
+    const previewText = previewPre?.textContent ?? ''
+
+    expect(previewText).toContain('<REDACTED:API_KEY>')
+    expect(previewText).not.toContain(secret)
+  } finally {
+    await act(async () => {
+      root.unmount()
+    })
     container.remove()
   }
 })
@@ -946,6 +1100,90 @@ domTest('loads corpus excerpt, injects into compose params, and renders preview 
   container.remove()
 })
 
+domTest('toggles focus mode with shortcut and panel buttons', async () => {
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),
+    invoke: async (cmd: string) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      return undefined
+    },
+    useOllamaStream: () => ({
+      startStream: async () => {},
+      abortStream: async () => {},
+      appendChunk: () => {},
+      isStreaming: false
+    })
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+  await act(async () => { root.render(<App />) })
+
+  const split = container.querySelector('.split')
+  expect(split).toBeInstanceOf(HTMLElement)
+  if (!(split instanceof HTMLElement)) throw new Error('Expected split container')
+
+  const leftTextarea = container.querySelector('textarea[data-side="left"]')
+  const rightTextarea = container.querySelector('textarea[data-side="right"]')
+  expect(leftTextarea).toBeInstanceOf(HTMLTextAreaElement)
+  expect(rightTextarea).toBeInstanceOf(HTMLTextAreaElement)
+  if (!(leftTextarea instanceof HTMLTextAreaElement) || !(rightTextarea instanceof HTMLTextAreaElement)) {
+    throw new Error('Expected both textareas')
+  }
+
+  await act(async () => { leftTextarea.focus() })
+  await flushEffects()
+
+  await act(async () => {
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'F', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true })
+    )
+  })
+  await flushEffects()
+
+  expect(split.classList.contains('focus-left')).toBe(true)
+  const rightPanel = container.querySelector('[data-panel="right"]')
+  expect(rightPanel).toBeInstanceOf(HTMLElement)
+  if (rightPanel instanceof HTMLElement) {
+    expect(rightPanel.getAttribute('data-focus-hidden')).toBe('true')
+  }
+
+  await act(async () => {
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'F', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true })
+    )
+  })
+  await flushEffects()
+
+  expect(split.classList.contains('focus-left')).toBe(false)
+
+  await act(async () => { rightTextarea.focus() })
+  await flushEffects()
+
+  await act(async () => {
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'f', metaKey: true, shiftKey: true, bubbles: true, cancelable: true })
+    )
+  })
+  await flushEffects()
+
+  expect(split.classList.contains('focus-right')).toBe(true)
+  const rightToggle = container.querySelector('[data-testid="focus-toggle-right"]')
+  expect(rightToggle).toBeInstanceOf(HTMLButtonElement)
+  if (!(rightToggle instanceof HTMLButtonElement)) throw new Error('Expected right focus toggle')
+
+  await act(async () => { rightToggle.click() })
+  await flushEffects()
+
+  expect(split.classList.contains('focus-right')).toBe(false)
+
+  await act(async () => { root.unmount() })
+  container.remove()
+})
+
 domTest('renders danger word badge only when left pane contains dangerous phrases', async () => {
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),
@@ -1130,4 +1368,68 @@ domTest('clears accumulated stream text after aborts and errors', async () => {
 
   await act(async () => { root.unmount() })
   container.remove()
+})
+
+domTest('defers save_run until stream completion without duplicate start', async () => {
+  let capturedHandlers: Parameters<UseOllamaStreamFn>[0] | null = null; let resolveStream: (() => void) | null = null; let startCalls = 0; const saveRunCalls: Array<Record<string, unknown>> = []
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({ status: 'ready', guidance: '', retry: vi.fn(async () => {}) }),
+    invoke: async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'save_run') { saveRunCalls.push(args ?? {}); return 'ok' }
+      return undefined
+    },
+    useOllamaStream: handlers => {
+      capturedHandlers = handlers
+      let streaming = false
+      const api: ReturnType<UseOllamaStreamFn> = {
+        startStream: async () => {
+          startCalls += 1
+          streaming = true
+          api.isStreaming = true
+          handlers?.onChunk?.('alpha ')
+          await new Promise<void>(resolve => {
+            resolveStream = () => {
+              streaming = false
+              api.isStreaming = false
+              resolve()
+            }
+          })
+        },
+        abortStream: async () => {
+          streaming = false
+          api.isStreaming = false
+        },
+        appendChunk: chunk => handlers?.onChunk?.(chunk),
+        isStreaming: streaming
+      }
+      return api
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div')); const root = createRoot(container)
+  try {
+    await act(async () => { root.render(<App />) })
+    const runButton = container.querySelector('.runpulse') as HTMLButtonElement | null
+    if (!runButton) throw new Error('Expected run button')
+
+    await act(async () => { runButton.click(); await Promise.resolve() })
+    await flushEffects()
+    expect(startCalls).toBe(1); expect(saveRunCalls).toHaveLength(0)
+    await act(async () => { capturedHandlers?.onChunk?.('beta') })
+    await flushEffects()
+    expect(startCalls).toBe(1); expect(saveRunCalls).toHaveLength(0)
+
+    await act(async () => { resolveStream?.(); await capturedHandlers?.onEnd?.() })
+    await flushEffects()
+    expect(startCalls).toBe(1); expect(saveRunCalls).toHaveLength(1)
+    const saveArgs = saveRunCalls[0] as { response_text?: string }; expect(saveArgs.response_text).toBe('alpha beta')
+    const rightTextarea = container.querySelector('textarea[data-side="right"]')
+    expect(rightTextarea).toBeInstanceOf(HTMLTextAreaElement); expect(rightTextarea?.value).toBe('alpha beta')
+  } finally {
+    await act(async () => { root.unmount() }); container.remove()
+  }
 })

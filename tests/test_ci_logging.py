@@ -7,9 +7,9 @@ import pytest
 
 
 def _resolve_workflow_path(base_dir: Path | None = None) -> Path:
-    """Return ``.github/workflows/tests.yml`` if it exists, otherwise ``test.yml``."""
+    """Locate the CI workflow, preferring ``tests.yml`` over ``test.yml``."""
 
-    root = base_dir or Path(".")
+    root = base_dir if base_dir is not None else Path(__file__).resolve().parent.parent
     workflows_dir = root / ".github" / "workflows"
     preferred = workflows_dir / "tests.yml"
     if preferred.exists():
