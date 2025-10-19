@@ -12,7 +12,7 @@ export const resolveKeybindOverlayState = (current: boolean, event: KeyboardLike
 
 export type KeybindShortcut = { keys: string; description: string }
 
-const FOCUS_MODE_SHORTCUT: KeybindShortcut = {
+export const FOCUS_MODE_SHORTCUT: KeybindShortcut = {
   keys: 'Ctrl/Cmd+Shift+F',
   description: 'フォーカスモードを切り替え（片側全画面⇔2ペイン）'
 }
