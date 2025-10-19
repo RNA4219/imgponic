@@ -237,7 +237,7 @@ export default function App() {
     setRightText('')
   }, [])
 
-  useOllamaStreamHook(
+  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook(
     {
       onChunk: chunk => {
         streamedResponseRef.current += chunk
