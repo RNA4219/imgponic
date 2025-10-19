@@ -229,9 +229,9 @@ async fn run_ollama_chat(
 
 #[cfg(feature = "gtk4")]
 #[cfg_attr(feature = "gtk4", tauri::command)]
-async fn run_ollama_stream(
+async fn run_ollama_stream_impl(
     window: tauri::Window,
-    state: tauri::State<'_, StreamState>,
+    state: &StreamState,
     model: String,
     system_text: String,
     user_text: String,
@@ -252,12 +252,12 @@ async fn run_ollama_stream(
     };
 
     let (handle, registration) = AbortHandle::new_pair();
-    let (stream_id, previous) = state.inner().register(handle).await;
+    let (stream_id, previous) = state.register(handle).await;
     if let Some(prev) = previous {
         prev.abort();
     }
 
-    let state_for_task = state.inner().clone();
+    let state_for_task = state.clone();
     let state_for_cleanup = state_for_task.clone();
     let window_for_task = window.clone();
 
@@ -354,6 +354,17 @@ async fn run_ollama_stream(
     });
 
     Ok(())
+}
+
+#[cfg_attr(feature = "gtk4", tauri::command)]
+async fn run_ollama_stream(
+    window: tauri::Window,
+    state: tauri::State<'_, StreamState>,
+    model: String,
+    system_text: String,
+    user_text: String,
+) -> Result<(), String> {
+    run_ollama_stream_impl(window, state.inner(), model, system_text, user_text).await
 }
 
 #[cfg(feature = "gtk4")]
