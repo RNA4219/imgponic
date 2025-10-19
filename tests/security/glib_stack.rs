@@ -15,8 +15,8 @@ fn parse_version_components(version: &str) -> Option<(u32, u32, u32)> {
 fn glib_version_is_at_least_0_20_0() {
     let lockfile = fs::read_to_string("Cargo.lock").expect("Cargo.lock should be readable");
 
-    let mut version_line: Option<String> = None;
     let mut in_glib_package = false;
+    let mut max_version: Option<((u32, u32, u32), String)> = None;
 
     for line in lockfile.lines() {
         let trimmed = line.trim();
@@ -32,19 +32,21 @@ fn glib_version_is_at_least_0_20_0() {
         }
 
         if in_glib_package && trimmed.starts_with("version =") {
-            version_line = Some(trimmed.to_string());
-            break;
+            if let Some(version_value) = trimmed.split('"').nth(1) {
+                if let Some(parsed) = parse_version_components(version_value) {
+                    match max_version {
+                        Some((current, _)) if current >= parsed => {}
+                        _ => {
+                            max_version = Some((parsed, version_value.to_string()));
+                        }
+                    }
+                }
+            }
         }
     }
 
-    let version_line = version_line.expect("glib entry with a version should exist in Cargo.lock");
-    let version_value = version_line
-        .split('"')
-        .nth(1)
-        .expect("version line should contain quoted value");
-
-    let parsed_version = parse_version_components(version_value)
-        .expect("version components should parse to integers");
+    let (parsed_version, version_value) = max_version
+        .expect("glib entry with a version should exist in Cargo.lock");
 
     assert!(
         parsed_version >= (0, 20, 0),
