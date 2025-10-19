@@ -34,7 +34,7 @@ next_review_due: 2025-11-14
 
 - **準備**
   - `npm install`（CI では `npm ci`）で Node 依存を解決し、`npm run lint` が通ることを確認。
-  - `cargo test --package promptforge --lib tests::workspace_backup` でバックアップ作成ロジックを検証後、
+  - `cargo test --test workspace_backup`（統合テスト。`--lib` オプションではない点に注意）でバックアップ作成ロジックを検証後、
     `cargo test` を全件実行。
   - Ollama が起動済みかを `ollama list | findstr llama3:8b`（Windows）/`ollama list | grep llama3:8b`（Unix）で確認し、
     未登録なら `ollama pull llama3:8b` を実行。
