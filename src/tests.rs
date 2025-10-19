@@ -244,13 +244,8 @@ mod ollama_stream_integration {
         })
     }
 
-    #[tokio::test]
-    async fn run_ollama_stream_emits_all_jsonl_lines() {
-        let server = spawn_streaming_server(vec![
-            "{\"response\":\"alpha \",\"done\":false}\n".to_string(),
-            "{\"response\":\"beta\",\"done\":true}\n".to_string(),
-        ])
-        .await;
+    async fn collect_stream(lines: Vec<String>, expected_jsonl: usize) -> (Vec<String>, String) {
+        let server = spawn_streaming_server(lines).await;
 
         let app = test::mock_app();
         let _ = app.manage(StreamState::default());
@@ -266,8 +261,10 @@ mod ollama_stream_integration {
                 let _ = jsonl_tx.send(raw);
             }
         });
-        let _ = window.listen("ollama:end", move |_| {
-            let _ = end_tx.send(());
+        let _ = window.listen("ollama:end", move |event| {
+            if let Ok(raw) = from_str::<String>(event.payload()) {
+                let _ = end_tx.send(raw);
+            }
         });
 
         let state = window.state::<StreamState>();
@@ -281,22 +278,56 @@ mod ollama_stream_integration {
         .await
         .expect("run stream command");
 
-        let first = timeout(Duration::from_secs(5), jsonl_rx.recv())
-            .await
-            .expect("first jsonl event")
-            .expect("jsonl payload");
-        let second = timeout(Duration::from_secs(5), jsonl_rx.recv())
-            .await
-            .expect("second jsonl event")
-            .expect("jsonl payload");
-        timeout(Duration::from_secs(5), end_rx.recv())
+        let mut jsonl_lines = Vec::with_capacity(expected_jsonl);
+        for idx in 0..expected_jsonl {
+            let line = timeout(Duration::from_secs(5), jsonl_rx.recv())
+                .await
+                .unwrap_or_else(|_| panic!("jsonl event {} not received", idx + 1))
+                .expect("jsonl payload");
+            jsonl_lines.push(line);
+        }
+
+        let aggregated = timeout(Duration::from_secs(5), end_rx.recv())
             .await
             .expect("end event")
-            .expect("end signal");
-
-        assert_eq!(first, "{\"response\":\"alpha \",\"done\":false}\n");
-        assert_eq!(second, "{\"response\":\"beta\",\"done\":true}\n");
+            .expect("end payload");
 
         server.await.expect("server task completed");
+
+        (jsonl_lines, aggregated)
+    }
+
+    #[tokio::test]
+    async fn run_ollama_stream_emits_all_jsonl_lines() {
+        let expected_first = "{\"response\":\"alpha \",\"done\":false}\n".to_string();
+        let expected_second = "{\"response\":\"beta\",\"done\":true}\n".to_string();
+        let (jsonl_lines, aggregated) =
+            collect_stream(vec![expected_first.clone(), expected_second.clone()], 2).await;
+
+        assert_eq!(
+            jsonl_lines,
+            vec![expected_first.clone(), expected_second.clone()]
+        );
+        assert_eq!(aggregated, format!("{}{}", expected_first, expected_second));
+    }
+
+    #[tokio::test]
+    async fn run_ollama_stream_handles_fragmented_chunks_without_loss() {
+        let expected_first = "{\"response\":\"alpha \",\"done\":false}\n".to_string();
+        let expected_second = "{\"response\":\"beta\",\"done\":true}\n".to_string();
+        let (jsonl_lines, aggregated) = collect_stream(
+            vec![
+                "{\"response\":\"alpha \"".to_string(),
+                format!(",\"done\":false}}\n{}", expected_second),
+            ],
+            2,
+        )
+        .await;
+
+        assert_eq!(
+            jsonl_lines,
+            vec![expected_first.clone(), expected_second.clone()]
+        );
+        assert_eq!(aggregated, format!("{}{}", expected_first, expected_second));
     }
 }
