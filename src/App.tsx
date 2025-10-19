@@ -225,6 +225,7 @@ export default function App() {
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
   const streamedResponseRef = useRef<string>('')
+  const hasSavedRunRef = useRef<boolean>(false)
   const updateLeftText = useCallback((value: string) => {
     setLeftText(value)
     setHasDangerWords(containsDangerWords(value))
@@ -232,22 +233,42 @@ export default function App() {
 
   const clearStreamedResponse = useCallback(() => {
     streamedResponseRef.current = ''
+    hasSavedRunRef.current = false
     setRightText('')
   }, [])
 
-  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
-    onChunk: chunk => {
-      streamedResponseRef.current = `${streamedResponseRef.current}${chunk}`
-      setRightText(prev => prev + chunk)
+  useOllamaStreamHook(
+    {
+      onChunk: chunk => {
+        streamedResponseRef.current += chunk
+        setRightText(prev => prev + chunk)
+      },
+      onEnd: async () => {
+        setRunning(false)
+        if (hasSavedRunRef.current) return
+        hasSavedRunRef.current = true
+        try {
+          await invokeFn<string>('save_run', {
+            recipePath,
+            final_prompt: composedRef.current?.final_prompt ?? '',
+            response_text: streamedResponseRef.current
+          })
+        } catch (error) {
+          console.error('save_run failed', error)
+          setOllamaError(describeOllamaError(error))
+          clearStreamedResponse()
+          hasSavedRunRef.current = true
+        }
+      },
+      onError: message => {
+        console.error('ollama stream error', message)
+        setRunning(false)
+        setOllamaError(describeOllamaError(message))
+        clearStreamedResponse()
+      }
     },
-    onEnd: () => setRunning(false),
-    onError: message => {
-      console.error('ollama stream error', message)
-      setRunning(false)
-      setOllamaError(describeOllamaError(message))
-      clearStreamedResponse()
-    }
-  })
+    [clearStreamedResponse, invokeFn, recipePath]
+  )
   const abortStream = useCallback(async () => {
     resetOllamaError()
     setRunning(false)
