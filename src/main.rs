@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::{Emitter, Manager};
 
-use crate::ollama_stream::{parse_ollama_jsonl_line, OllamaEvent, ParsedOllamaLine, StreamState};
+use crate::ollama_stream::{emit_events_for_line, parse_ollama_jsonl_line, StreamState};
 use crate::setup_check::check_ollama_setup;
 
 #[derive(Debug, Deserialize)]
@@ -257,7 +257,6 @@ async fn run_ollama_stream(
     let task = async move {
         let mut finished = false;
         let mut buffer = String::new();
-        let mut _raw_lines: Vec<String> = Vec::new();
         let send_result: Result<(), String> = async {
             let client = reqwest::Client::new();
             let response = client

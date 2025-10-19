@@ -572,7 +572,7 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
     expect(rightTextarea.value).toBe('Network reachable')
 
     await act(async () => {
-      await capturedHandlers?.onEnd?.()
+      await capturedHandlers?.onEnd?.({ raw: '{"response":"Network reachable","done":true}\n' })
     })
     await flushEffects()
 
@@ -580,7 +580,7 @@ domTest('renders ollama error banner and clears it on dismiss or retry', async (
     expect(saveRunCalls[0]).toMatchObject({
       recipePath: 'data/recipes/demo.sora2.yaml',
       final_prompt: 'SYS\n---\nUSER_INPUT',
-      response_text: 'Network reachable'
+      response_text: '{"response":"Network reachable","done":true}\n'
     })
     expect(rightTextarea.value).toBe('Network reachable')
 
@@ -891,7 +891,7 @@ domTest('stop button aborts stream once without saving partial response', async 
           async () => {
             setStreaming(false)
             await abortStreamImpl()
-            await handlers?.onEnd?.()
+            await handlers?.onEnd?.({ raw: '' })
           },
           [abortStreamImpl, handlers]
         ),
@@ -971,7 +971,7 @@ domTest('redacts over-limit secrets in preview and compose invocation', async ()
     useOllamaStream: handlers => ({
       startStream: async args => {
         await startStreamImpl(args)
-        handlers?.onEnd?.()
+        handlers?.onEnd?.({ raw: '' })
       },
       abortStream: async () => {},
       appendChunk: chunk => handlers?.onChunk?.(chunk),
@@ -1595,7 +1595,7 @@ domTest('saves stream results once the stream completes', async () => {
         handlers?.onChunk?.('first ')
         handlers?.onChunk?.('second')
         await Promise.resolve()
-        await handlers?.onEnd?.()
+        await handlers?.onEnd?.({ raw: '{"response":"first "}\n{"response":"second","done":true}\n' })
       },
       abortStream: async () => {},
       appendChunk: chunk => handlers?.onChunk?.(chunk),
@@ -1617,7 +1617,7 @@ domTest('saves stream results once the stream completes', async () => {
   const saveArgs = saveRunCalls[0] as { recipePath?: string; final_prompt?: string; response_text?: string }
   expect(saveArgs.recipePath).toBe('data/recipes/demo.sora2.yaml')
   expect(saveArgs.final_prompt).toBe('SYS\n---\nUSER_INPUT final')
-  expect(saveArgs.response_text).toBe('first second')
+  expect(saveArgs.response_text).toBe('{"response":"first "}\n{"response":"second","done":true}\n')
 
   const rightTextarea = container.querySelector('textarea[data-side="right"]')
   expect(rightTextarea).toBeInstanceOf(HTMLTextAreaElement)
@@ -1653,11 +1653,11 @@ domTest('clears accumulated stream text after aborts and errors', async () => {
             handlers?.onError?.('boom')
           } else if (startCount === 3) {
             handlers?.onChunk?.('third')
-            await handlers?.onEnd?.()
+            await handlers?.onEnd?.({ raw: '{"response":"third","done":true}\n' })
           }
         },
         abortStream: async () => {
-          await handlers?.onEnd?.()
+          await handlers?.onEnd?.({ raw: '{"response":"first","done":true}\n' })
         },
         appendChunk: chunk => handlers?.onChunk?.(chunk),
         isStreaming: false
@@ -1678,16 +1678,19 @@ domTest('clears accumulated stream text after aborts and errors', async () => {
   expect(streamApi).not.toBeNull()
   await act(async () => { await streamApi?.abortStream() })
   await act(async () => { await Promise.resolve() })
-  expect(savedTexts).toEqual(['first'])
+  expect(savedTexts).toEqual(['{"response":"first","done":true}\n'])
 
   await act(async () => { runButton.click() })
   await act(async () => { await Promise.resolve() })
-  expect(savedTexts).toEqual(['first'])
+  expect(savedTexts).toEqual(['{"response":"first","done":true}\n'])
 
   await act(async () => { runButton.click() })
   await act(async () => { await Promise.resolve() })
   await act(async () => { await Promise.resolve() })
-  expect(savedTexts).toEqual(['first', 'third'])
+  expect(savedTexts).toEqual([
+    '{"response":"first","done":true}\n',
+    '{"response":"third","done":true}\n'
+  ])
 
   const rightTextarea = container.querySelector('textarea[data-side="right"]')
   expect(rightTextarea).toBeInstanceOf(HTMLTextAreaElement)
@@ -1749,12 +1752,14 @@ domTest('defers save_run until stream completion without duplicate start', async
     expect(startCalls).toBe(1); expect(saveRunCalls).toHaveLength(0)
     await act(async () => {
       capturedHandlers?.onChunk?.('beta')
-      capturedHandlers?.onJsonl?.('{"response":"beta","done":true}\n')
     })
     await flushEffects()
     expect(startCalls).toBe(1); expect(saveRunCalls).toHaveLength(0)
 
-    await act(async () => { resolveStream?.(); await capturedHandlers?.onEnd?.() })
+    await act(async () => {
+      resolveStream?.()
+      await capturedHandlers?.onEnd?.({ raw: '{"response":"alpha ","done":false}\n{"response":"beta","done":true}\n' })
+    })
     await flushEffects()
     expect(startCalls).toBe(1)
     expect(saveRunCalls).toEqual([
@@ -1762,7 +1767,7 @@ domTest('defers save_run until stream completion without duplicate start', async
         recipePath: 'data/recipes/demo.sora2.yaml',
         final_prompt: 'SYS\n---\nUSER_INPUT',
         response_jsonl: '{"response":"alpha ","done":false}\n{"response":"beta","done":true}\n',
-        response_text: 'alpha beta'
+        response_text: '{"response":"alpha ","done":false}\n{"response":"beta","done":true}\n'
       }
     ])
     const rightTextarea = container.querySelector('textarea[data-side="right"]')
@@ -1807,19 +1812,18 @@ domTest('aggregates raw jsonl lines before invoking save_run', async () => {
     await act(async () => { runButton.click(); await Promise.resolve() })
     expect(saveRunCalls).toHaveLength(0)
 
-    await act(async () => {
-      capturedHandlers?.onJsonl?.('{"response":"alpha"}\n')
-      capturedHandlers?.onJsonl?.('{"response":"beta","done":true}')
-    })
+    const aggregated = '{"response":"alpha"}\n{"response":"beta","done":true}'
     expect(saveRunCalls).toHaveLength(0)
 
-    await act(async () => { capturedHandlers?.onEnd?.() })
+    await act(async () => {
+      capturedHandlers?.onEnd?.({ raw: aggregated })
+    })
     expect(saveRunCalls).toEqual([
       {
         recipePath: 'data/recipes/demo.sora2.yaml',
         final_prompt: 'SYS\n---\nUSER_INPUT',
-        response_jsonl: '{"response":"alpha"}\n{"response":"beta","done":true}',
-        response_text: ''
+        response_jsonl: aggregated,
+        response_text: aggregated
       }
     ])
   } finally {

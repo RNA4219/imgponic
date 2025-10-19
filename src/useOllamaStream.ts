@@ -7,10 +7,12 @@ type UnlistenFn = () => void | Promise<void>
 
 type StreamArgs = { model: string; systemText: string; userText: string }
 
+type StreamResult = { raw: string }
+
 type StreamHandlers = {
   onChunk?: (chunk: string) => void
   onJsonl?: (jsonl: string) => void
-  onEnd?: () => void
+  onEnd?: (result: StreamResult) => void
   onError?: (message: string) => void
 }
 
@@ -21,11 +23,15 @@ export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
   const handlerRef = useRef(handlers)
   const unlistenRef = useRef<UnlistenFn[] | null>(null)
   const streamingRef = useRef(false)
+  const rawJsonlRef = useRef('')
 
   useEffect(() => { handlerRef.current = handlers }, [handlers])
 
   const appendChunk = useCallback((chunk: string) => handlerRef.current.onChunk?.(chunk), [])
-  const appendJsonl = useCallback((jsonl: string) => handlerRef.current.onJsonl?.(jsonl), [])
+  const appendJsonl = useCallback((jsonl: string) => {
+    rawJsonlRef.current += jsonl
+    handlerRef.current.onJsonl?.(jsonl)
+  }, [])
 
   const clearListeners = useCallback(async () => {
     const current = unlistenRef.current
@@ -39,14 +45,21 @@ export const useOllamaStream = (handlers: StreamHandlers = {}): StreamState => {
     streamingRef.current = false
     setIsStreaming(false)
     void clearListeners()
-    if (kind === 'end') handlerRef.current.onEnd?.()
-    else handlerRef.current.onError?.(reason instanceof Error ? reason.message : String(reason ?? ''))
+    if (kind === 'end') {
+      const result = { raw: rawJsonlRef.current }
+      rawJsonlRef.current = ''
+      handlerRef.current.onEnd?.(result)
+    } else {
+      rawJsonlRef.current = ''
+      handlerRef.current.onError?.(reason instanceof Error ? reason.message : String(reason ?? ''))
+    }
   }, [clearListeners])
 
   const startStream = useCallback(async (args: StreamArgs) => {
     if (streamingRef.current) return
     streamingRef.current = true
     setIsStreaming(true)
+    rawJsonlRef.current = ''
     const unlisteners: UnlistenFn[] = []
     const window = getCurrentWindow()
     const register = async (name: string, cb: (event: unknown) => void) =>
@@ -128,14 +141,17 @@ if (import.meta.vitest) {
     })
 
     it('appends chunks and resolves on end events', async () => {
-      const chunks: string[] = []; const ends: number[] = []
-      const { result, unmount } = mount({ onChunk: chunk => chunks.push(chunk), onEnd: () => ends.push(1) })
+      const chunks: string[] = []; const ends: string[] = []
+      const { result, unmount } = mount({
+        onChunk: chunk => chunks.push(chunk),
+        onEnd: ({ raw }) => ends.push(raw)
+      })
       const startPromise = result.current?.startStream({ model: 'm', systemText: 's', userText: 'u' }) ?? Promise.resolve()
       await act(async () => { await Promise.resolve() })
       expect(result.current?.isStreaming).toBe(true)
       listeners['ollama:chunk']?.({ payload: 'hello' }); expect(chunks).toEqual(['hello'])
       await act(async () => { listeners['ollama:end']?.({}); resolveRun?.(); await startPromise })
-      expect(result.current?.isStreaming).toBe(false); expect(ends.length).toBe(1)
+      expect(result.current?.isStreaming).toBe(false); expect(ends).toEqual([''])
       unmount()
     })
 
