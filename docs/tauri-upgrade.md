@@ -2,6 +2,13 @@
 
 調査日時: 2025-10-19
 
+## 2025-02-XX cargo audit 警告メモ
+
+| Crate | RUSTSEC | 状態 | 暫定対応策 |
+| ----- | ------- | ---- | ----------- |
+| `atk` / `atk-sys` / `gtk3-macros` / `proc-macro-error` | 2024-0413 / 2024-0416 / 2024-0419 / 2024-0370 | GTK3 系クレートが非メンテ保守。 `tauri` → `wry` → `gtk` 依存で伝播。 | GTK4 移行待ち。`wry`/`tao` の GTK4 対応ブランチがリリースされ次第、`tauri` 側の semver 更新を追従し `cargo update -p wry -p tao -p gtk` を実行する。進捗は [tauri-apps/tauri#12563](https://github.com/tauri-apps/tauri/issues/12563) を継続監視。|
+| `fxhash` | 2025-0057 | `kuchikiki` → `selectors` 連鎖で非メンテ保守。 | `wry` speedreader の HTML parser 置き換え待ち。上流の [tauri-apps/wry#1609](https://github.com/tauri-apps/wry/issues/1609) の完了後、`cargo update -p wry` を実行して解消を確認。 interim では `cargo audit --deny warnings` を CI に追加し再発防止。|
+
 ## 候補ブランチ・フォーク一覧
 
 | 対象 | 上流 | ref | 最新コミット | 対応 WebKit | 備考 |
