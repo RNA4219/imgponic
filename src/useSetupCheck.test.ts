@@ -60,7 +60,7 @@ const renderHook = async (model: string): Promise<RenderHookResult> => {
 
 describe('useSetupCheck', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
   })
 
   it('fetches setup status once on mount and reports success', async () => {
@@ -73,6 +73,27 @@ describe('useSetupCheck', () => {
     expect(invoke).toHaveBeenCalledWith('check_ollama_setup', { model: 'phi' })
     expect(hook.result.current.status).toBe('ok')
     expect(hook.result.current.guidance).toBe('ready')
+
+    await hook.unmount()
+  })
+
+  it('runs setup check again when current model changes', async () => {
+    vi.mocked(invoke)
+      .mockResolvedValueOnce({ status: 'ok', guidance: 'phi ready' })
+      .mockResolvedValueOnce({ status: 'ok', guidance: 'mistral ready' })
+
+    const hook = await renderHook('phi')
+    await flushEffects()
+
+    expect(invoke).toHaveBeenCalledTimes(1)
+    expect(invoke).toHaveBeenLastCalledWith('check_ollama_setup', { model: 'phi' })
+
+    await hook.rerender('mistral')
+    await flushEffects()
+
+    expect(invoke).toHaveBeenCalledTimes(2)
+    expect(invoke).toHaveBeenLastCalledWith('check_ollama_setup', { model: 'mistral' })
+    expect(hook.result.current.guidance).toBe('mistral ready')
 
     await hook.unmount()
   })
