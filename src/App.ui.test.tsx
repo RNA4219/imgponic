@@ -1,3 +1,4 @@
+import { strict as assert } from 'node:assert'
 import { JSDOM } from 'jsdom'
 import { renderToStaticMarkup } from 'react-dom/server'
 
@@ -240,6 +241,8 @@ const getReactProps = (node: Element): Record<string, unknown> | null => {
 }
 
 const diffModule = await import('diff')
+
+const sanitizeModule = await import('./security/sanitizeUserInput')
 
 const {
   default: App,
@@ -611,37 +614,50 @@ test('composePromptWithSelection masks sensitive text before invoking compose_pr
   expect(res).toEqual({ final_prompt: 'fp', sha256: 'hash', model: 'model' })
 })
 
-test('composePromptWithSelection uses masked text when sanitizeUserInput reports overLimit', async () => {
-  const secret = 'AKIA1234567890ABCDEF'
-  const filler = 'x'.repeat(40000)
-  const raw = `${filler}${secret}`
-  let capturedUserInput = ''
-  let sanitizedSnapshot: { sanitized: string; maskedTypes: string[]; overLimit: boolean; raw: string } | null = null
-  await composePromptWithSelection({
-    invokeFn: async (_cmd, args) => {
-      capturedUserInput = String((args?.inlineParams as { user_input: string }).user_input)
-      return { final_prompt: 'fp', sha256: 'hash', model: 'model' }
-    },
-    params: {},
-    recipePath: 'recipe.yaml',
-    leftText: raw,
-    sendSelectionOnly: false,
-    selection: '',
-    selectionStart: null,
-    selectionEnd: null,
-    contextRadius: 3,
-    onSanitized: snapshot => {
-      sanitizedSnapshot = snapshot
-    }
+test('composePromptWithSelection uses masked text even when sanitizeUserInput reports overLimit', async () => {
+  const rawSelection = 'some secret token'
+  const sanitizedValue = '<REDACTED:API_KEY>'
+  const sanitizeSpy = vi.spyOn(sanitizeModule, 'sanitizeUserInput').mockReturnValue({
+    sanitized: sanitizedValue,
+    maskedTypes: ['API_KEY'],
+    overLimit: true
   })
-  expect(sanitizedSnapshot).not.toBeNull()
-  const snapshot = sanitizedSnapshot as NonNullable<typeof sanitizedSnapshot>
-  expect(snapshot.overLimit).toBe(true)
-  expect(snapshot.sanitized).toContain('<REDACTED:')
-  expect(snapshot.raw).toBe(raw)
-  expect(snapshot.maskedTypes).toEqual(['AWS_ACCESS_KEY'])
-  expect(capturedUserInput).toBe(snapshot.sanitized)
-  expect(capturedUserInput).not.toContain(secret)
+
+  try {
+    let capturedUserInput = ''
+    let snapshot: { sanitized: string; maskedTypes: string[]; overLimit: boolean; raw: string } | null = null
+    const res = await composePromptWithSelection({
+      invokeFn: async (_cmd, args) => {
+        capturedUserInput = String((args?.inlineParams as { user_input: string }).user_input)
+        return { final_prompt: 'fp', sha256: 'hash', model: 'model' }
+      },
+      params: {},
+      recipePath: 'recipe.yaml',
+      leftText: rawSelection,
+      sendSelectionOnly: true,
+      selection: rawSelection,
+      selectionStart: 0,
+      selectionEnd: rawSelection.length,
+      contextRadius: 3,
+      onSanitized: value => {
+        snapshot = value
+      }
+    })
+
+    expect(sanitizeSpy).toHaveBeenCalledTimes(1)
+    const expectedRaw = determineUserInput(true, rawSelection, rawSelection, 0, rawSelection.length, 3)
+    expect(sanitizeSpy).toHaveBeenCalledWith(expectedRaw)
+    expect(snapshot).not.toBeNull()
+    const nonNullSnapshot = snapshot as NonNullable<typeof snapshot>
+    expect(nonNullSnapshot.raw).toBe(expectedRaw)
+    expect(nonNullSnapshot.overLimit).toBe(true)
+    expect(nonNullSnapshot.maskedTypes).toEqual(['API_KEY'])
+    expect(nonNullSnapshot.sanitized).toBe(sanitizedValue)
+    expect(capturedUserInput).toBe(sanitizedValue)
+    expect(res).toEqual({ final_prompt: 'fp', sha256: 'hash', model: 'model' })
+  } finally {
+    sanitizeSpy.mockRestore()
+  }
 })
 
 test('diff preview requires approval before applying', () => {

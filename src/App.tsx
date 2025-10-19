@@ -117,9 +117,10 @@ export const composePromptWithSelection = async (
 ): Promise<ComposeResult> => {
   const rawUserInput = determineUserInput(sendSelectionOnly, selection, leftText, selectionStart, selectionEnd, contextRadius)
   const sanitized = sanitizeUserInput(rawUserInput)
-  const sanitizedText = sanitized.sanitized
-  onSanitized?.({ ...sanitized, sanitized: sanitizedText, raw: rawUserInput })
-  const res = await invokeFn('compose_prompt', { recipePath, inlineParams: { ...params, user_input: sanitizedText } })
+  const sanitizedSnapshot = { ...sanitized, raw: rawUserInput }
+  onSanitized?.(sanitizedSnapshot)
+  const userInput = sanitizedSnapshot.sanitized
+  const res = await invokeFn('compose_prompt', { recipePath, inlineParams: { ...params, user_input: userInput } })
   return res as ComposeResult
 }
 
