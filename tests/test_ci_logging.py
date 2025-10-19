@@ -3,9 +3,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 
 def _resolve_workflow_path(base_dir: Path | None = None) -> Path:
-    """Return the workflow file path, preferring ``tests.yml`` over ``test.yml``."""
+    """Return ``.github/workflows/tests.yml`` if it exists, otherwise ``test.yml``."""
 
     root = base_dir or Path(".")
     workflows_dir = root / ".github" / "workflows"
@@ -30,23 +32,30 @@ def _extract_step(block: str, name: str) -> str:
     return match.group("body")
 
 
-# NOTE: The CI workflow may be named ``tests.yml`` or ``test.yml``; keep both variants supported.
-def test_resolve_workflow_path_prefers_tests(tmp_path: Path) -> None:
+@pytest.fixture
+def workflow_root(tmp_path: Path) -> Path:
+    """Provide a temporary repository root with a CI workflows directory."""
+
     workflows_dir = tmp_path / ".github" / "workflows"
     workflows_dir.mkdir(parents=True)
+    return tmp_path
+
+
+# NOTE: The CI workflow may be named ``tests.yml`` or ``test.yml``; keep both variants supported.
+def test_resolve_workflow_path_prefers_tests(workflow_root: Path) -> None:
+    workflows_dir = workflow_root / ".github" / "workflows"
     tests_file = workflows_dir / "tests.yml"
     tests_file.write_text("name: tests", encoding="utf-8")
 
-    assert _resolve_workflow_path(tmp_path) == tests_file
+    assert _resolve_workflow_path(workflow_root) == tests_file
 
 
-def test_resolve_workflow_path_falls_back_to_test(tmp_path: Path) -> None:
-    workflows_dir = tmp_path / ".github" / "workflows"
-    workflows_dir.mkdir(parents=True)
+def test_resolve_workflow_path_falls_back_to_test(workflow_root: Path) -> None:
+    workflows_dir = workflow_root / ".github" / "workflows"
     test_file = workflows_dir / "test.yml"
     test_file.write_text("name: test", encoding="utf-8")
 
-    assert _resolve_workflow_path(tmp_path) == test_file
+    assert _resolve_workflow_path(workflow_root) == test_file
 
 
 def test_rust_job_uploads_cargo_test_log() -> None:
