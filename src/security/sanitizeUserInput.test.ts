@@ -51,6 +51,17 @@ describe('sanitizeUserInput', () => {
     expect(result.maskedTypes).toEqual(['AWS_ACCESS_KEY'])
   })
 
+  it('preserves overLimit while redacting secrets beyond the maximum length', () => {
+    const secret = 'AKIA1234567890ABCDEF'
+    const longText = `${'x'.repeat(MAX_LENGTH)}${secret}`
+
+    const result = sanitizeUserInput(longText)
+
+    expect(result.overLimit).toBe(true)
+    expect(result.sanitized).toBe(`${'x'.repeat(MAX_LENGTH)}<REDACTED:AWS_ACCESS_KEY>`)
+    expect(result.maskedTypes).toContain('AWS_ACCESS_KEY')
+  })
+
   it('keeps text untouched just below the limit', () => {
     const thresholdText = 'b'.repeat(40000)
     const result = sanitizeUserInput(thresholdText)

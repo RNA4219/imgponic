@@ -614,6 +614,41 @@ test('composePromptWithSelection masks sensitive text before invoking compose_pr
   expect(res).toEqual({ final_prompt: 'fp', sha256: 'hash', model: 'model' })
 })
 
+test('composePromptWithSelection redacts secrets while keeping overLimit true', async () => {
+  const MAX_LENGTH = 40000
+  const secret = 'AKIA1234567890ABCDEF'
+  const leftText = `${'x'.repeat(MAX_LENGTH)}${secret}`
+  let capturedUserInput = ''
+  let snapshot: { sanitized: string; maskedTypes: string[]; overLimit: boolean; raw: string } | null = null
+
+  const res = await composePromptWithSelection({
+    invokeFn: async (_cmd, args) => {
+      capturedUserInput = String((args?.inlineParams as { user_input: string }).user_input)
+      return { final_prompt: 'fp', sha256: 'hash', model: 'model' }
+    },
+    params: {},
+    recipePath: 'recipe.yaml',
+    leftText,
+    sendSelectionOnly: false,
+    selection: '',
+    selectionStart: null,
+    selectionEnd: null,
+    contextRadius: 3,
+    onSanitized: value => {
+      snapshot = value
+    }
+  })
+
+  expect(snapshot).not.toBeNull()
+  const nonNullSnapshot = snapshot as NonNullable<typeof snapshot>
+  expect(nonNullSnapshot.raw).toBe(leftText)
+  expect(nonNullSnapshot.overLimit).toBe(true)
+  expect(nonNullSnapshot.maskedTypes).toEqual(['AWS_ACCESS_KEY'])
+  expect(nonNullSnapshot.sanitized).toBe(`${'x'.repeat(MAX_LENGTH)}<REDACTED:AWS_ACCESS_KEY>`)
+  expect(capturedUserInput).toBe(nonNullSnapshot.sanitized)
+  expect(res).toEqual({ final_prompt: 'fp', sha256: 'hash', model: 'model' })
+})
+
 test('composePromptWithSelection uses masked text even when sanitizeUserInput reports overLimit', async () => {
   const rawSelection = 'some secret token'
   const sanitizedValue = '<REDACTED:API_KEY>'
