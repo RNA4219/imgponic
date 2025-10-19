@@ -5,6 +5,9 @@ import { describe, expect, it } from 'vitest'
 
 import KeybindOverlay, { FOCUS_MODE_SHORTCUT, KEYBIND_SHORTCUTS } from './KeybindOverlay'
 
+const FOCUS_MODE_KEYS = 'Ctrl/Cmd+Shift+F'
+const FOCUS_MODE_DESCRIPTION = 'フォーカスモードを切り替え（片側全画面⇔2ペイン）'
+
 const renderOverlay = async (open: boolean) => {
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -27,11 +30,12 @@ const renderOverlay = async (open: boolean) => {
 
 describe('KeybindOverlay focus mode shortcut', () => {
   it('includes the focus mode toggle shortcut in KEYBIND_SHORTCUTS', () => {
+    expect(FOCUS_MODE_SHORTCUT).toEqual({ keys: FOCUS_MODE_KEYS, description: FOCUS_MODE_DESCRIPTION })
     expect(KEYBIND_SHORTCUTS).toContainEqual(FOCUS_MODE_SHORTCUT)
 
-    const focusModeEntry = KEYBIND_SHORTCUTS.find(shortcut => shortcut.keys === 'Ctrl/Cmd+Shift+F')
+    const focusModeEntry = KEYBIND_SHORTCUTS.find(shortcut => shortcut.keys === FOCUS_MODE_KEYS)
     expect(focusModeEntry).toBeDefined()
-    expect(focusModeEntry?.description).toBe('フォーカスモードを切り替え（片側全画面⇔2ペイン）')
+    expect(focusModeEntry?.description).toBe(FOCUS_MODE_DESCRIPTION)
   })
 
   it('renders the focus mode shortcut within the overlay when open', async () => {
@@ -42,8 +46,8 @@ describe('KeybindOverlay focus mode shortcut', () => {
       node => node.textContent
     )
 
-    expect(keyCells).toContain('Ctrl/Cmd+Shift+F')
-    expect(descriptionCells).toContain('フォーカスモードを切り替え（片側全画面⇔2ペイン）')
+    expect(keyCells).toContain(FOCUS_MODE_KEYS)
+    expect(descriptionCells).toContain(FOCUS_MODE_DESCRIPTION)
 
     await unmount()
   })
