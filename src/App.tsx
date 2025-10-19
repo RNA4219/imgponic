@@ -237,38 +237,35 @@ export default function App() {
     setRightText('')
   }, [])
 
-  useOllamaStreamHook(
-    {
-      onChunk: chunk => {
-        streamedResponseRef.current += chunk
-        setRightText(prev => prev + chunk)
-      },
-      onEnd: async () => {
-        setRunning(false)
-        if (hasSavedRunRef.current) return
-        hasSavedRunRef.current = true
-        try {
-          await invokeFn<string>('save_run', {
-            recipePath,
-            final_prompt: composedRef.current?.final_prompt ?? '',
-            response_text: streamedResponseRef.current
-          })
-        } catch (error) {
-          console.error('save_run failed', error)
-          setOllamaError(describeOllamaError(error))
-          clearStreamedResponse()
-          hasSavedRunRef.current = true
-        }
-      },
-      onError: message => {
-        console.error('ollama stream error', message)
-        setRunning(false)
-        setOllamaError(describeOllamaError(message))
+  const { startStream, abortStream: rawAbortStream, isStreaming } = useOllamaStreamHook({
+    onChunk: chunk => {
+      streamedResponseRef.current += chunk
+      setRightText(prev => prev + chunk)
+    },
+    onEnd: async () => {
+      setRunning(false)
+      if (hasSavedRunRef.current) return
+      hasSavedRunRef.current = true
+      try {
+        await invokeFn<string>('save_run', {
+          recipePath,
+          final_prompt: composedRef.current?.final_prompt ?? '',
+          response_text: streamedResponseRef.current
+        })
+      } catch (error) {
+        console.error('save_run failed', error)
+        setOllamaError(describeOllamaError(error))
         clearStreamedResponse()
+        hasSavedRunRef.current = true
       }
     },
-    [clearStreamedResponse, invokeFn, recipePath]
-  )
+    onError: message => {
+      console.error('ollama stream error', message)
+      setRunning(false)
+      setOllamaError(describeOllamaError(message))
+      clearStreamedResponse()
+    }
+  })
   const abortStream = useCallback(async () => {
     resetOllamaError()
     setRunning(false)
