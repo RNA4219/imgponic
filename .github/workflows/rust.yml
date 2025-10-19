@@ -20,16 +20,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install GTK dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-4-dev \
-            libwebkitgtk-6.0-dev \
-            libjavascriptcoregtk-6.0-dev \
-            libsoup-3.0-dev
+      - name: Install GTK4/WebKitGTK6/GLib dev
+        run: bash scripts/install-gtk4-webkit6-dev.sh
       - name: Assert GTK stack
         run: ./tools/ci/assert-gtk-stack.sh
+      - name: Cargo lock sanity
+        run: rg 'name = "glib"|name = "gtk4"|name = "webkit6"|name = "webkit2gtk"' -n Cargo.lock || true
       - run: mkdir -p workflow-cookbook/logs
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -57,6 +53,7 @@ jobs:
           }
           run_check rust::fmt cargo fmt --all -- --check
           run_check rust::clippy cargo clippy --all-targets --all-features -D warnings
+          run_check rust::test_glib_stack cargo test --test glib_stack --features security
           run_check rust::test cargo test --all-features --workspace
           run_check rust::build cargo build --release --workspace
           run_check rust::doc env RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
