@@ -18,6 +18,7 @@ use futures_util::future::{AbortHandle, Abortable};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tauri::{Emitter, Manager};
 
 use crate::ollama_stream::{parse_ollama_jsonl_chunk, OllamaEvent, StreamState};
 use crate::setup_check::check_ollama_setup;

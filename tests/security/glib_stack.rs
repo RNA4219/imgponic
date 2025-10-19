@@ -1,10 +1,7 @@
 use std::fs;
 
 fn parse_version_components(version: &str) -> Option<(u32, u32, u32)> {
-    let core = version
-        .split(['+', '-'])
-        .next()
-        .map(str::trim)?;
+    let core = version.split(['+', '-']).next().map(str::trim)?;
     let mut parts = core.split('.');
 
     let major = parts.next()?.parse().ok()?;
@@ -49,5 +46,9 @@ fn glib_version_is_at_least_0_20_0() {
     let parsed_version = parse_version_components(version_value)
         .expect("version components should parse to integers");
 
-    assert!(parsed_version >= (0, 20, 0), "glib version too old: {}", version_value);
+    assert!(
+        parsed_version >= (0, 20, 0),
+        "glib version too old: {}",
+        version_value
+    );
 }
