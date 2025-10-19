@@ -227,6 +227,20 @@ export default function App() {
   const [leftSelection, setLeftSelection] = useState<string>('')
   const [leftSelectionStart, setLeftSelectionStart] = useState<number | null>(null)
   const [leftSelectionEnd, setLeftSelectionEnd] = useState<number | null>(null)
+  useEffect(() => {
+    if (composedRef.current) {
+      setComposed(null)
+    }
+  }, [
+    leftText,
+    sendSelectionOnly,
+    leftSelection,
+    leftSelectionStart,
+    leftSelectionEnd,
+    recipePath,
+    ollamaModel,
+    params
+  ])
   const hasSavedRunRef = useRef<boolean>(false)
   const updateLeftText = useCallback((value: string) => {
     setLeftText(value)
