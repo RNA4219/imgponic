@@ -202,3 +202,101 @@ mod compose_prompt_sandbox {
         assert!(result.final_prompt.contains("Inline text"));
     }
 }
+
+mod ollama_stream_integration {
+    use crate::{ollama_stream::StreamState, run_ollama_stream};
+
+    use serde_json::from_str;
+    use tauri::{test, Listener, Manager, WindowBuilder};
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+        sync::mpsc,
+        time::{timeout, Duration},
+    };
+
+    async fn spawn_streaming_server(lines: Vec<String>) -> tokio::task::JoinHandle<()> {
+        let listener = TcpListener::bind("127.0.0.1:11434")
+            .await
+            .expect("bind mock ollama server");
+        tokio::spawn(async move {
+            if let Ok((mut socket, _)) = listener.accept().await {
+                let mut collected = Vec::new();
+                let mut buf = [0u8; 1024];
+                while let Ok(n) = socket.read(&mut buf).await {
+                    if n == 0 {
+                        break;
+                    }
+                    collected.extend_from_slice(&buf[..n]);
+                    if collected.windows(4).any(|w| w == b"\r\n\r\n") {
+                        break;
+                    }
+                }
+                let mut response = b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ntransfer-encoding: chunked\r\n\r\n".to_vec();
+                for line in lines {
+                    response
+                        .extend_from_slice(format!("{:x}\r\n{}\r\n", line.len(), line).as_bytes());
+                }
+                response.extend_from_slice(b"0\r\n\r\n");
+                let _ = socket.write_all(&response).await;
+                let _ = socket.shutdown().await;
+            }
+        })
+    }
+
+    #[tokio::test]
+    async fn run_ollama_stream_emits_all_jsonl_lines() {
+        let server = spawn_streaming_server(vec![
+            "{\"response\":\"alpha \",\"done\":false}\n".to_string(),
+            "{\"response\":\"beta\",\"done\":true}\n".to_string(),
+        ])
+        .await;
+
+        let app = test::mock_app();
+        let _ = app.manage(StreamState::default());
+        let window = WindowBuilder::new(&app, "ollama-stream-test")
+            .build()
+            .expect("create window");
+
+        let (jsonl_tx, mut jsonl_rx) = mpsc::unbounded_channel();
+        let (end_tx, mut end_rx) = mpsc::unbounded_channel();
+
+        let _ = window.listen("ollama:jsonl", move |event| {
+            if let Ok(raw) = from_str::<String>(event.payload()) {
+                let _ = jsonl_tx.send(raw);
+            }
+        });
+        let _ = window.listen("ollama:end", move |_| {
+            let _ = end_tx.send(());
+        });
+
+        let state = window.state::<StreamState>();
+        run_ollama_stream(
+            window.clone(),
+            state,
+            "mock-model".into(),
+            "system".into(),
+            "user".into(),
+        )
+        .await
+        .expect("run stream command");
+
+        let first = timeout(Duration::from_secs(5), jsonl_rx.recv())
+            .await
+            .expect("first jsonl event")
+            .expect("jsonl payload");
+        let second = timeout(Duration::from_secs(5), jsonl_rx.recv())
+            .await
+            .expect("second jsonl event")
+            .expect("jsonl payload");
+        timeout(Duration::from_secs(5), end_rx.recv())
+            .await
+            .expect("end event")
+            .expect("end signal");
+
+        assert_eq!(first, "{\"response\":\"alpha \",\"done\":false}\n");
+        assert_eq!(second, "{\"response\":\"beta\",\"done\":true}\n");
+
+        server.await.expect("server task completed");
+    }
+}
