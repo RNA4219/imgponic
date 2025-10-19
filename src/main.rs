@@ -264,6 +264,7 @@ async fn run_ollama_stream(
     let task = async move {
         let mut finished = false;
         let mut buffer = String::new();
+        let mut raw_lines: Vec<String> = Vec::new();
         let send_result: Result<(), String> = async {
             let client = reqwest::Client::new();
             let response = client
@@ -280,23 +281,32 @@ async fn run_ollama_stream(
                 }
                 match parse_ollama_jsonl_line(&raw) {
                     Ok(parsed) => {
-                        emit_events_for_line(
+                        let mut done_triggered = false;
+                        let mut errored = false;
+                        let line_finished = emit_events_for_line(
                             parsed,
                             |jsonl| {
+                                raw_lines.push(jsonl.clone());
                                 let _ = window_for_task.emit("ollama:jsonl", jsonl);
                             },
                             |chunk| {
                                 let _ = window_for_task.emit("ollama:chunk", chunk);
                             },
                             || {
-                                finished = true;
-                                let _ = window_for_task.emit("ollama:end", ());
+                                done_triggered = true;
                             },
                             |msg| {
-                                finished = true;
+                                errored = true;
                                 let _ = window_for_task.emit("ollama:error", msg);
                             },
                         );
+                        if done_triggered {
+                            finished = true;
+                            let aggregated = raw_lines.join("");
+                            let _ = window_for_task.emit("ollama:end", aggregated);
+                        } else if errored || line_finished {
+                            finished = true;
+                        }
                         Ok(())
                     }
                     Err(err) => Err(err.to_string()),
