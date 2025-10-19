@@ -189,6 +189,7 @@ export default function App() {
   const [leftText, setLeftText] = useState<string>(INITIAL_LEFT_TEXT)
   const [rightText, setRightText] = useState<string>('（ここに整形結果が出ます）')
   const [hasDangerWords, setHasDangerWords] = useState<boolean>(() => containsDangerWords(INITIAL_LEFT_TEXT))
+  const [focusedPanel, setFocusedPanel] = useState<'left' | 'right' | null>(null)
 
   // レシピ/モデル
   const [recipePath, setRecipePath] = useState('data/recipes/demo.sora2.yaml')
@@ -215,6 +216,7 @@ export default function App() {
   const resetOllamaError = useCallback(() => setOllamaError(null), [])
   const runBtnRef = useRef<HTMLButtonElement>(null)
   const leftTextRef = useRef<HTMLTextAreaElement>(null)
+  const rightTextRef = useRef<HTMLTextAreaElement>(null)
   const corpusInputRef = useRef<HTMLInputElement>(null)
   const [sendSelectionOnly, setSendSelectionOnly] = useState<boolean>(false)
   const [leftSelection, setLeftSelection] = useState<string>('')
@@ -529,6 +531,21 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey
+      if (mod && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setFocusedPanel(prev => {
+          if (prev) return null
+          const active = document.activeElement
+          if (active && leftTextRef.current && leftTextRef.current.contains(active as Node)) {
+            return 'left'
+          }
+          if (active && rightTextRef.current && rightTextRef.current.contains(active as Node)) {
+            return 'right'
+          }
+          return 'left'
+        })
+        return
+      }
       if (mod && e.key === 'Enter') { e.preventDefault(); runOllama() }
       if (mod && e.key.toLowerCase() === 's') {
         e.preventDefault()
@@ -550,6 +567,10 @@ export default function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [runOllama, copy, saveLeftToProject, rightText])
+
+  const focusClass = focusedPanel ? ` focus-${focusedPanel}` : ''
+  const leftHidden = focusedPanel === 'right'
+  const rightHidden = focusedPanel === 'left'
 
   return (
     <div style={{ padding: 16 }}>
@@ -733,15 +754,45 @@ export default function App() {
         </div>
       )}
 
+      {focusedPanel && (
+        <div
+          className="toolbar focus-banner"
+          style={{ marginBottom: 12, justifyContent: 'space-between' }}
+        >
+          <span className="badge">フォーカスモード: {focusedPanel === 'left' ? '左ペイン' : '右ペイン'}</span>
+          <button
+            className="btn"
+            type="button"
+            data-testid="focus-mode-exit"
+            onClick={() => setFocusedPanel(null)}
+          >
+            2ペイン表示に戻る
+          </button>
+        </div>
+      )}
+
       {/* 分割ビュー */}
-      <div className="split">
+      <div className={`split${focusClass}`}>
         {/* 左：入力 */}
-        <div className="panel">
+        <div
+          className="panel"
+          data-panel="left"
+          style={{ display: leftHidden ? 'none' : undefined }}
+          aria-hidden={leftHidden}
+        >
           <h3>
             <span>入力</span>
             <span className="toolbar">
               <button className="btn" onClick={() => writeText(leftText)}>コピー</button>
               <button className="btn" onClick={() => saveAs('left.txt', leftText)}>別名保存</button>
+              <button
+                className="btn"
+                type="button"
+                data-testid="left-focus-toggle"
+                onClick={() => setFocusedPanel(prev => (prev === 'left' ? null : 'left'))}
+              >
+                {focusedPanel === 'left' ? '解除' : '左をフォーカス'}
+              </button>
             </span>
           </h3>
           <div className="area">
@@ -757,17 +808,35 @@ export default function App() {
         </div>
 
         {/* 右：LLM整形出力 */}
-        <div className="panel">
+        <div
+          className="panel"
+          data-panel="right"
+          style={{ display: rightHidden ? 'none' : undefined }}
+          aria-hidden={rightHidden}
+        >
           <h3>
             <span>LLM（整形出力）</span>
             <span className="toolbar">
               <button className="btn" onClick={openDiffPreview}>⇧ 反映</button>
               <button className="btn" onClick={() => writeText(rightText)}>コピー</button>
               <button className="btn" onClick={() => saveAs('right.txt', rightText)}>別名保存</button>
+              <button
+                className="btn"
+                type="button"
+                data-testid="right-focus-toggle"
+                onClick={() => setFocusedPanel(prev => (prev === 'right' ? null : 'right'))}
+              >
+                {focusedPanel === 'right' ? '解除' : '右をフォーカス'}
+              </button>
             </span>
           </h3>
           <div className="area">
-            <textarea data-side="right" value={rightText} onChange={e => setRightText(e.target.value)} />
+            <textarea
+              data-side="right"
+              ref={rightTextRef}
+              value={rightText}
+              onChange={e => setRightText(e.target.value)}
+            />
           </div>
         </div>
       </div>

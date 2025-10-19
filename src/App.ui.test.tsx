@@ -313,6 +313,87 @@ domTest('renders setup guidance banner when offline and retries on demand', asyn
   container.remove()
 })
 
+domTest('Ctrl/Cmd+Shift+F toggles focus mode and reset button restores layout', async () => {
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({
+      status: 'ready',
+      guidance: '',
+      retry: vi.fn(async () => {})
+    }),
+    useOllamaStream: () => ({
+      ...noopStream
+    }),
+    invoke: async (cmd: string) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  try {
+    await act(async () => {
+      root.render(<App />)
+    })
+
+    const split = await waitForElement(() => container.querySelector('.split'), 'split layout')
+    expect(split?.classList.contains('focus-left')).toBe(false)
+    expect(split?.classList.contains('focus-right')).toBe(false)
+
+    const leftTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="left"]'),
+      'left textarea'
+    )
+
+    await act(async () => {
+      leftTextarea.focus()
+    })
+
+    const dispatchToggle = async () => {
+      const event = new KeyboardEvent('keydown', { key: 'F', ctrlKey: true, shiftKey: true, bubbles: true })
+      window.dispatchEvent(event)
+      await flushEffects()
+    }
+
+    await dispatchToggle()
+
+    expect(split?.classList.contains('focus-left')).toBe(true)
+    const rightPanel = container.querySelector('[data-panel="right"]') as HTMLElement | null
+    expect(rightPanel?.style.display).toBe('none')
+
+    const resetButton = await waitForElement(
+      () => container.querySelector('[data-testid="focus-mode-exit"]') as HTMLButtonElement | null,
+      'focus mode exit button'
+    )
+
+    await act(async () => {
+      resetButton.click()
+    })
+    await flushEffects()
+
+    expect(split?.classList.contains('focus-left')).toBe(false)
+    expect(split?.classList.contains('focus-right')).toBe(false)
+    expect(rightPanel?.style.display).toBe('')
+
+    await dispatchToggle()
+    expect(split?.classList.contains('focus-left')).toBe(true)
+
+    await dispatchToggle()
+    expect(split?.classList.contains('focus-left')).toBe(false)
+    expect(split?.classList.contains('focus-right')).toBe(false)
+  } finally {
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  }
+})
+
 domTest('renders setup guidance banner when model is missing', async () => {
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({
