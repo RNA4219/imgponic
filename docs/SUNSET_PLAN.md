@@ -75,8 +75,8 @@ owner: workflow-qa
 
 ## チェックリスト
 
-- [ ] [`project/recipe-digest.template.md`](../project/recipe-digest.template.md) に従ってダイジェストを更新し、
-  `pnpm tsx tools/sunset/recipeDigest.ts --output project/recipe-digest.md` を実行した結果を確認する。
+- [ ] [`project/recipe-digest.template.md`](../project/recipe-digest.template.md) に従ってダイジェストを更新する。
+  - `pnpm tsx tools/sunset/recipeDigest.ts --output project/recipe-digest.md` を実行し結果を確認する。
 
 ## 資産保全
 

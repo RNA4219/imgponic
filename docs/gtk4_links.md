@@ -1,6 +1,6 @@
 # GTK4 / GLib 0.20 対応関連リンク
 
-> このウォッチリストは [SUNSET_PLAN の「再開前提」節](./SUNSET_PLAN.md#再開前提) からの逆参照先です。
+## 再確認サイクル: 月次レビュー（毎月第1営業日）
 
 - 月次確認サイクル: 月次レビュー（毎月第1営業日）に棚卸しを実施。
 - 担当者ローテーション: `workflow-qa` → `runtime-maintainers` → `docs-support` の順に月単位で交代し、完了報告は `#imgponic-governance` チャンネルへ掲示。

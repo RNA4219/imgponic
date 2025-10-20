@@ -2,7 +2,7 @@
 
 **版**: v0.3（MVP）  
 **日付**: 2025-10-18（Asia/Tokyo）  
-**スタック**: Rust（Tauri v1） + TypeScript（React + Vite） + Ollama（localhost:11434）
+**スタック**: Rust（Tauri v2） + TypeScript（React + Vite） + Ollama（localhost:11434）
 
 ---
 
@@ -94,8 +94,11 @@ corpus/        # 簡易RAG対象の .txt
 project/       # 編集対象の .py/.txt/.md/.json（サンドボックス）
 
 runs/<ts>/     # 実行ログ
-src/           # React
-src-tauri/     # Rust (Tauri)
+src/           # React + Rust（Tauri 2 コマンド実装）
+  main.tsx     # React エントリポイント
+  main.rs      # Rust エントリポイント（Tauriコマンド起動）
+dist/          # React/Vite のビルド成果物（`npm run build`）
+target/        # Rust/Tauri のビルド成果物（`target/release/bundle/` など）
 scripts/*.bat  # Windows 起動/ビルド
 ```
 

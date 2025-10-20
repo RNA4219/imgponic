@@ -132,6 +132,7 @@ failed to select a version for `tauri` which could resolve this conflict
 - 症状: `glib-sys` の `pkg-config` 解決で失敗し `cargo clippy --all-targets --all-features -D warnings` が落ちる。
 - 原因: Linux ビルド前提の dev パッケージ（glib-2.0, gtk4, webkitgtk-6.0, libsoup-3.0 他）が未導入。
 - 対処:
+
   1. `scripts/install-gtk4-webkit6-dev.sh` を実行（ディストロ自動判別）。
   2. `cargo update -p glib -p gtk4 -p webkit6 || true`
   3. `cargo clippy --all-targets --all-features -- -D warnings` を再実行しグリーンを確認。
