@@ -1,10 +1,12 @@
 ---
 intent_id: INT-001
 owner: your-handle
-status: active   # draft|active|deprecated
-last_reviewed_at: 2025-10-14
-next_review_due: 2025-11-14
+status: deprecated   # draft|active|deprecated
+last_reviewed_at: 2025-10-20
+next_review_due: 2026-04-20
 ---
+
+本資料は2025-10-20にワークフローポリシーを`docs/migration/tauri2-gtk4.md`へ移管したため凍結し、以降はそちらを参照してください。
 
 # Agent Tool Policy — Dual Stack
 
