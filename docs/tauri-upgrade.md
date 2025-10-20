@@ -142,23 +142,23 @@ failed to select a version for `tauri` which could resolve this conflict
 - 結果: 成功（差分なし）
 
 ## 2025-10-19 glib_stack テスト失敗再確認
-- `cargo test --test glib_stack --no-default-features --features security` で `tests/security/glib_stack.rs` の `glib >= 0.20.0` アサーションが失敗。
-- `Cargo.lock` の `glib` / `gtk` は依然として `0.18.x` (`0.18.5` / `0.18.2`) に留まっていることを `rg 'name = "glib"' -n Cargo.lock` および `rg 'name = "gtk"' -n Cargo.lock` で確認。
+- `cargo test --test glib_stack --no-default-features --features security` を実行し、`tests/security/glib_stack.rs` の `glib >= 0.20.0` アサーションが継続して失敗することを確認。
+- `rg 'name = "glib"' -n Cargo.lock` / `rg 'name = "gtk"' -n Cargo.lock` により、ロックファイル上の `glib = 0.18.5`・`gtk = 0.18.2` が未更新であることを再確認。
 - 参考ログ:
 ```
 running 1 test
-test glib_version_is_at_least_0_20_0 ... FAILED
+test glib_and_companions_are_upgraded ... FAILED
 
 failures:
 
----- glib_version_is_at_least_0_20_0 stdout ----
+---- glib_and_companions_are_upgraded stdout ----
 
-thread 'glib_version_is_at_least_0_20_0' panicked at tests/security/glib_stack.rs:51:5:
+thread 'glib_and_companions_are_upgraded' panicked at tests/security/glib_stack.rs:54:5:
 glib version too old: 0.18.5
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
 failures:
-    glib_version_is_at_least_0_20_0
+    glib_and_companions_are_upgraded
 
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+error: test failed, to rerun pass `--test glib_stack`
 ```
