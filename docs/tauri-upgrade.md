@@ -1,6 +1,6 @@
 # GTK4 / GLib ≥0.20 移行メモ
 
-調査日時: 2025-10-19
+調査日時: 2025-10-19（再調査: `cargo test --test glib_stack` 失敗ログ更新）
 
 ## 2025-02-XX cargo audit 警告メモ
 
@@ -13,44 +13,41 @@
 
 | 対象 | 上流 | ref | 最新コミット | 対応 WebKit | MSRV | Linux 必須 feature / 備考 |
 | ---- | ---- | --- | ------------ | ----------- | ---- | -------------------------- |
-| tauri | (該当候補未確認) | – | – | – | – | Issue [#12563](https://github.com/tauri-apps/tauri/issues/12563) で移行作業募集中（`gtk4` feature 未提供）。 |
-| wry | [conradhale/wry](https://github.com/conradhale/wry) | `dev` | `fdce27aca03b79682cb7779483bd69d25f0134c6` | `webkit6` crate v0.4（`features = ["v2_42"]` → WebKitGTK ≥ 2.42）【72b118†L18-L38】 | 1.77（現行 dev と同一）【72b118†L6-L17】 | Linux 向けに `gtk4 0.9` / `glib 0.20.9` を採用し、デフォルトの `os-webview` で GTK4 スタックを有効化。`dev-dependencies` が `tao 0.32` へ固定されているため `glib 0.18.5` もロックファイルに残存。|
-| tao | [conradhale/tao](https://github.com/conradhale/tao) | `dev` | `0fa97b7e3288bdda4b1a43a58117cdb154206d68` | –（WebView 非依存） | 1.74（現行 dev と同一）【c27b59†L1-L40】 | Linux 依存は `gtk4` / `gdk4-*` 0.9 系と `glib 0.20.9` に更新。feature `x11` が削除され既定では X11/Wayland 両対応。|
+| tauri | (該当候補未確認) | – | – | – | 1.77.2（`dev` ワークスペース）【58f80b†L1-L1】 | Issue [#12563](https://github.com/tauri-apps/tauri/issues/12563) で GTK4 移行作業募集中。GTK4/GLib ≥0.20 を提供する公開ブランチ・フォークは未確認。 |
+| wry | [conradhale/wry](https://github.com/conradhale/wry) | `dev` | `fdce27aca03b79682cb7779483bd69d25f0134c6`【f3704a†L1-L2】 | `webkit6` crate v0.4（`features = ["v2_42"]` → WebKitGTK ≥2.42）【8f530a†L35-L41】 | 1.77（`rust-version` 明示）【8f530a†L12-L18】 | Linux で `default = ["drag-drop","protocol","os-webview"]` を維持し GTK4 スタック (`gtk4 0.9`/`glib 0.20`) を必須化。`x11` feature は未定義。 |
+| tao | [conradhale/tao](https://github.com/conradhale/tao) | `dev` | `0fa97b7e3288bdda4b1a43a58117cdb154206d68`【ac3bf5†L1-L2】 | –（WebView 非依存） | 1.74（`rust-version` 明示）【be52cb†L1-L13】 | Linux 依存を `gtk4` / `gdk4-*` 0.9 系へ刷新。Wayland は `gdk4-wayland` の `wayland_crate` feature を要する。【be52cb†L70-L81】 |
 
 ## Cargo.toml 差分メモ
 
 ### wry (`conradhale/wry@fdce27a`)
-- `rust-version = "1.77"`（現行 dev と同一）。
+- `rust-version = "1.77"` で現行 `tauri` dev と足並み一致。【8f530a†L12-L18】【58f80b†L1-L1】
 - Linux 用依存関係:
-  - `webkit = { package = "webkit6", version = "0.4", features = ["v2_42"] }`
-  - `gtk = { package = "gtk4", version = "0.9", features = ["v4_6"] }`
-  - `soup3 = { version = "0.7" }`
-- 既存プロジェクトでは `tauri` 経由で `wry` デフォルト feature を使用しており、`dev` ブランチでは `x11` feature が初期有効だったが当該フォークでは未定義。
-  - TODO: X11 サポート要件（`gdk4-x11` 等）と feature 再導入の要否を確認する。
-- WebKit GTK 6.0 向けビルドに合わせ `pkg-config` の mapping は済（`tools/pkg-config-webkit.sh`）だが、CI イメージの WebKitGTK ≥ 2.42/GTK4.6 が揃っているか確認が必要。
-  - TODO: Linux CI コンテナの WebKitGTK/GTK バージョン要件を洗い出す。
-- lockfile 上は `atk` 系 GTK3 クレートが残存し、`glib` が 0.18.5/0.20.9 の二重取り込みになっている。【a64352†L1-L27】【91d757†L1-L7】
-  - TODO: `webkit6` 由来の GTK3 依存をどの段階で除去できるか調査する。
+  - `webkit = { package = "webkit6", version = "0.4", features = ["v2_42"] }`（WebKitGTK ≥2.42）。【8f530a†L35-L41】
+  - `gtk = { package = "gtk4", version = "0.9", features = ["v4_6"] }`。【8f530a†L35-L41】
+  - `soup3 = { version = "0.7" }`。【8f530a†L33-L41】
+- `default = ["drag-drop", "protocol", "os-webview"]` で X11 明示 feature が外され、GTK4/GLib ≥0.20 を前提にする構成。【8f530a†L24-L39】
+- 現行ロックは `wry 0.53.4` のため、`0.50.5` への `[patch]` 差し替えは semver 不整合で拒否される。【8f530a†L5-L7】【aefbb0†L1-L5】
+- TODO: GTK3 系クレート排除と `x11` feature 再導入の要否を整理する。
 
 ### tao (`conradhale/tao@0fa97b7e`)
-- `rust-version = "1.74"`（現行 dev と同一）。
+- `rust-version = "1.74"` と `tauri` dev より低いが 1.77 系までの互換は維持されている想定。【be52cb†L1-L13】【58f80b†L1-L1】
 - Linux 依存関係が GTK4 系に更新:
-  - `gtk = { package = "gtk4", version = "0.9", features = ["v4_6"] }`
-  - `gdk-x11 = { package = "gdk4-x11", version = "0.9" }`
-  - `gdk-wayland = { package = "gdk4-wayland", version = "0.9", features = ["wayland_crate"] }`
-  - `dlopen2 = "0.7.0"`（新規）
-- TODO: 既存の `tao` patch（tauri-apps/tao@dev）と比べて X11/Wayland feature 名の違いを精査し、`tauri.conf.json` 等で追加設定が必要か判定する。
-- lockfile は `glib` 0.20.9 のみとなり、GTK3 依存は削除済み。【eade2a†L1-L3】
+  - `gtk = { package = "gtk4", version = "0.9", features = ["v4_6"] }`。【be52cb†L70-L78】
+  - `gdk-x11 = { package = "gdk4-x11", version = "0.9" }`。【be52cb†L70-L78】
+  - `gdk-wayland = { package = "gdk4-wayland", version = "0.9", features = ["wayland_crate"] }`。【be52cb†L70-L81】
+  - `dlopen2 = "0.7.0"`（新規追加）。【be52cb†L70-L81】
+- 現行ロックは `tao 0.34.4` のため、`0.32.8` へ `[patch]` 差し替えは semver 不整合で拒否される。【be52cb†L1-L13】【8f06b6†L1-L5】
+- TODO: Wayland/X11 feature の整合確認と設定フローを検討する。
 
 ### tauri
-- 現時点で GTK4/GLib ≥0.20 対応コードを公開している upstream フォークを確認できず（`gtk4` feature も未実装）。
-- TODO: Issue [#12563](https://github.com/tauri-apps/tauri/issues/12563) の進捗と関連 PR を継続監視し、公開ブランチ出現時に再調査する。
+- 公式 `dev` ワークスペースは Rust 1.77.2 を要求するが、GTK4/GLib ≥0.20 を提供する公開ブランチ・フォークは未確認。【58f80b†L1-L1】
+- TODO: Issue [#12563](https://github.com/tauri-apps/tauri/issues/12563) の進捗と関連 PR を継続監視する。
 
 ## 互換性ギャップ整理
 
-- `wry@fdce27a`: crate version が `0.50.5` のままのため、`tauri` が要求する `^0.53.4` に合致せず `[patch]` で差し替え不可。また lockfile に GTK3 系（`atk` など）が残り `glib 0.18.5` が混在する。【8f3bfc†L1-L64】【91d757†L1-L7】【a64352†L1-L27】
-- `tao@0fa97b7e`: crate version `0.32.8` が `tauri` 側要求 `^0.34.4` と乖離し差し替え不可だが、依存は GTK4 系へ完全移行済みで `glib 0.20.9` のみを使用。【c27b59†L1-L82】【eade2a†L1-L3】
-- `tauri`: `gtk4` feature 未提供のため、現状アプリ側で feature を有効化してもビルド不可（Issue [#12563](https://github.com/tauri-apps/tauri/issues/12563)）。【c9d575†L92-L120】
+- `wry@fdce27a`: crate version `0.50.5` がロック済み `wry 0.53.4` と不一致。`default` から `x11` feature が外れているため、X11 が必要な場合は独自 feature 補完が必要になる。【8f530a†L5-L39】【aefbb0†L1-L5】
+- `tao@0fa97b7e`: crate version `0.32.8` がロック済み `tao 0.34.4` と不一致。Wayland では `gdk4-wayland` の `wayland_crate` feature を要求するため、既存設定との差分検証が必要。【be52cb†L1-L81】【8f06b6†L1-L5】
+- `glib`: 現行ロックは `0.18.5` のままで、GTK4 ブランチへ切り替えない限りセキュリティテストが継続的に失敗する。【a340fa†L1-L5】【613437†L1-L20】
 
 # Tauri GTK4 アップグレード検証ログ
 
@@ -142,23 +139,5 @@ failed to select a version for `tauri` which could resolve this conflict
 - 結果: 成功（差分なし）
 
 ## 2025-10-19 glib_stack テスト失敗再確認
-- `cargo test --test glib_stack --no-default-features --features security` で `tests/security/glib_stack.rs` の `glib >= 0.20.0` アサーションが失敗。
-- `Cargo.lock` の `glib` / `gtk` は依然として `0.18.x` (`0.18.5` / `0.18.2`) に留まっていることを `rg 'name = "glib"' -n Cargo.lock` および `rg 'name = "gtk"' -n Cargo.lock` で確認。
-- 参考ログ:
-```
-running 1 test
-test glib_version_is_at_least_0_20_0 ... FAILED
-
-failures:
-
----- glib_version_is_at_least_0_20_0 stdout ----
-
-thread 'glib_version_is_at_least_0_20_0' panicked at tests/security/glib_stack.rs:51:5:
-glib version too old: 0.18.5
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-
-failures:
-    glib_version_is_at_least_0_20_0
-
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-```
+- `cargo test --test glib_stack --no-default-features --features security` を実行すると、`glib version too old: 0.18.5` と出力されて失敗する。【613437†L1-L20】
+- `Cargo.lock` の `glib` は依然 `0.18.5` で、GTK3 依存が残存している。【a340fa†L1-L5】
