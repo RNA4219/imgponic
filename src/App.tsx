@@ -617,20 +617,28 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey
-      if (mod && e.shiftKey && e.key.toLowerCase() === 'f') {
+      const isFocusShortcut = mod && e.shiftKey && e.key.toLowerCase() === 'f'
+
+      const detectActivePane = (): 'left' | 'right' | null => {
+        const activeElement = typeof document !== 'undefined' ? document.activeElement : null
+        if (!activeElement) return null
+        if (leftTextRef.current?.contains(activeElement)) return 'left'
+        if (rightTextRef.current?.contains(activeElement)) return 'right'
+        if (activeElement instanceof HTMLElement) {
+          const side = activeElement.getAttribute('data-side')
+          return side === 'left' || side === 'right' ? side : null
+        }
+        return null
+      }
+
+      if (isFocusShortcut) {
         e.preventDefault()
-        setFocusedPanel(prev => {
-          if (prev) return null
-          const active = document.activeElement
-          if (active && leftTextRef.current && leftTextRef.current.contains(active as Node)) {
-            return 'left'
-          }
-          if (active && rightTextRef.current && rightTextRef.current.contains(active as Node)) {
-            return 'right'
-          }
-          return 'left'
+        const activePane = detectActivePane()
+        setFocusedPanel(prev => (prev ? null : activePane ?? 'left'))
+        setFocusTarget(prev => {
+          const nextTarget = activePane ?? prev ?? 'left'
+          return prev === nextTarget ? null : nextTarget
         })
-        return
       }
       if (mod && e.key === 'Enter') { e.preventDefault(); runOllama() }
       if (mod && e.key.toLowerCase() === 's') {
@@ -641,21 +649,7 @@ export default function App() {
         e.preventDefault()
         copy(rightText)
       }
-      if (mod && e.shiftKey && e.key.toLowerCase() === 'f') {
-        e.preventDefault()
-        setFocusTarget(prev => {
-          const activeElement = typeof document !== 'undefined' ? document.activeElement : null
-          const activeSide = (() => {
-            if (!activeElement || !(activeElement instanceof HTMLElement)) return null
-            const side = activeElement.getAttribute('data-side')
-            return side === 'left' || side === 'right' ? side : null
-          })()
-          const nextTarget = activeSide ?? prev ?? 'left'
-          return prev === nextTarget ? null : nextTarget
-        })
-        return
-      }
-
+      
       let preventOverlayToggle = false
       setShowKeybindOverlay(prev => {
         const next = resolveKeybindOverlayState(prev, e)
