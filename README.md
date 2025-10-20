@@ -27,6 +27,7 @@ Ollamaと連携し、**完全ローカル・Docker不要**。
 撤退スケジュールやサポート体制の詳細は [docs/SUNSET_PLAN.md](docs/SUNSET_PLAN.md) を参照してください。
 
 - **最終リリースの取得**: 最終版アーカイブは GitHub Releases の `v1.0.0` を保持し、必要時のみ再配布してください。
+- **ログ資産の保全**: `runs/` の最新ログを圧縮する際は [SUNSET_PLAN.md の資産保全手順](docs/SUNSET_PLAN.md#資産保全) を参照してください。
 - **ログ保全**: `runs/<timestamp>/` 配下の作業ログは各自の責任でバックアップし、検証証跡として保全します。
 - **問い合わせ窓口**: 撤退期間中の連絡は `sunset@imgponic.dev`（対応: 平日 10:00-16:00 JST）へお願いします。
 
