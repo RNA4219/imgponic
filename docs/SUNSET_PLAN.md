@@ -31,4 +31,3 @@ owner: workflow-qa
 
 - オーナー: workflow-qa（`#imgponic-governance` チャンネル）
 - エスカレーション: `governance/policy.yaml` に定義されたプロセスへ従うこと。
-

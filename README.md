@@ -15,7 +15,8 @@ next_review_due: 2025-04-01
 
 **Theme:** main `#C4FCC4` / background `#FFFFEE`
 
-> **開発凍結中**：`tauri` GTK4 系依存が未解決のため、新機能開発とメンテナンスを停止しています（Issue #12563 等の上流対応待ち）。凍結下の運用方針は [`docs/SUNSET_PLAN.md`](docs/SUNSET_PLAN.md) を参照してください。
+> **開発凍結中**：`tauri` GTK4 系依存が未解決のため、新機能開発とメンテナンスを停止しています
+> （Issue #12563 等の上流対応待ち）。凍結下の運用方針は [`docs/SUNSET_PLAN.md`](docs/SUNSET_PLAN.md) を参照してください。
 
 Imgponic は、**プロンプトとコードを“育てる”ためのローカルツール**です。
 左右2ペインで編集→整形→反映のループを高速に回せます。
