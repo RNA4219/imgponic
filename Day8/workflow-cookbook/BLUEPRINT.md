@@ -32,6 +32,7 @@ next_review_due: 2025-11-14
 - TypeScript/React 側は ESM 構成を維持し、Tauri コマンド呼び出しのシグネチャを変更しない（後方互換を必須とする）。
 - `PROMPTFORGE_DATA_DIR` で切り替えた場合も、`ensure_under` により `data/`, `project/`, `runs/` のサンドボックス境界外へ書き出さない。
 - `runs/<timestamp>/` 配下のファイル命名（`recipe.path.txt`, `prompt.final.txt`, `response.raw.jsonl`）と JSON スキーマ互換を保持し、既存ログが再利用できるようにする。
+- 凍結状態での運用判断と資産保全は [`docs/SUNSET_PLAN.md`](../../docs/SUNSET_PLAN.md) に従い、再開条件を満たすまでは新規機能開発をブロックする。
 - 設計・資料更新は本 Blueprint から派生させ、実装差分は 100 行/2 ファイル以内へ収める（ドキュメントは例外）。
 
 ## 4. I/O Contract
