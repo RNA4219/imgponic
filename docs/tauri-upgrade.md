@@ -143,8 +143,9 @@ failed to select a version for `tauri` which could resolve this conflict
 
 ## 2025-10-19 追加メモ（glib 0.18 系ロック再確認）
 - `rustup update stable` と `cargo install cargo-audit --locked` / `cargo install cargo-deny --locked` を実行し、ツールチェーンを Rust 1.90.0・監査ツール最新版へ更新。【d7ce33†L1-L6】【d5d59e†L1-L4】【17a04b†L1-L3】
-- `cargo test --test glib_stack --features security` は `glib-sys v0.18.1` がシステムの `glib-2.0 >= 2.70` を要求してビルドスクリプトが失敗し、`tests/security/glib_stack.rs` の `glib >= 0.20.0` アサーション確認には至らず（GTK3 ランタイム未導入が原因）。【fee476†L1-L29】
-- `Cargo.lock` の `glib = 0.18.5` / `gtk = 0.18.2` 参照は依然として残存し、`glib` 0.20 系へは未更新。【7f6109†L8-L18】【27e6ea†L8-L14】
+- `cargo test -p lockcheck --features security -- --nocapture` で lockfile を検査する仕組みに置き換え、`glib-sys` ビルドの前にロック判定が実行可能に（GTK3 ランタイム未導入でも検証継続可）。【13217e†L1-L8】
+- `Cargo.lock` の `glib = 0.18.5` / `gtk = 0.18.2` 参照は依然として残存し、`glib` 0.20 系へは未更新。【F:Cargo.lock†L1337-L1378】【F:Cargo.lock†L1456-L1474】
+- `tools/lockcheck` ユーティリティクレートを追加し、`Cargo.toml` の `[[test]] glib_stack` を移管。GTK3/WebKit2 の残存有無も併せて検証する。【F:Cargo.toml†L1-L24】【F:tools/lockcheck/Cargo.toml†L1-L17】【F:tools/lockcheck/tests/glib_stack.rs†L40-L93】【F:Cargo.lock†L5228-L5249】
 
 ### 参考ログ
 ```text

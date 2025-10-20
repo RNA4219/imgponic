@@ -2089,6 +2089,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "libxdo"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00333b8756a3d28e78def82067a377de7fa61b24909000aeaa2b446a948d14db"
+dependencies = [
+ "libxdo-sys",
+]
+
+[[package]]
+name = "libxdo-sys"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db23b9e7e2b7831bbd8aac0bbeeeb7b68cbebc162b227e7052e8e55829a09212"
+dependencies = [
+ "libc",
+ "x11",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2113,6 +2132,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "224399e74b87b5f3557511d98dff8b14089b3dadafcab6bb93eab67d3aace965"
 dependencies = [
  "scopeguard",
+]
+
+[[package]]
+name = "lockcheck"
+version = "0.1.0"
+dependencies = [
+ "semver",
+ "toml 0.8.2",
 ]
 
 [[package]]
@@ -2226,6 +2253,7 @@ dependencies = [
  "dpi",
  "gtk",
  "keyboard-types",
+ "libxdo",
  "objc2 0.6.3",
  "objc2-app-kit",
  "objc2-core-foundation",
@@ -3065,6 +3093,8 @@ dependencies = [
  "glib 0.20.12",
  "hex",
  "insta",
+ "libappindicator",
+ "muda",
  "reqwest",
  "serde",
  "serde_json",
@@ -3077,6 +3107,7 @@ dependencies = [
  "tauri-plugin-fs",
  "tempfile",
  "tokio",
+ "tray-icon",
  "walkdir",
 ]
 

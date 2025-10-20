@@ -1,0 +1,17 @@
+[package]
+name = "lockcheck"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dev-dependencies]
+toml = "0.8"
+semver = "1"
+
+[features]
+security = []
+
+[[test]]
+name = "glib_stack"
+path = "tests/glib_stack.rs"
+required-features = ["security"]
