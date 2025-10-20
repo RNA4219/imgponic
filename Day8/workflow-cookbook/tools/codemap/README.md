@@ -1,6 +1,9 @@
 # codemap ツール
 
-`codemap.update` は Birdseye のインデックス (`docs/birdseye/index.json`) とカプセル (`docs/birdseye/caps/*.json`) を、対象ルート配下の Markdown front matter に記載されたメタデータへ同期するユーティリティです。front matter から抽出した値は `metadata` フィールドとして各ノードへ反映され、`generated_at` が最新の更新時刻へ差し替えられます。
+`codemap.update` は Birdseye のインデックス (`docs/birdseye/index.json`) とカプセル
+(`docs/birdseye/caps/*.json`) を対象ルート配下の Markdown front matter に記載された
+メタデータへ同期するユーティリティです。front matter から抽出した値は `metadata`
+フィールドとして各ノードへ反映され、`generated_at` が最新の更新時刻へ差し替えられます。
 
 ## 依存
 
