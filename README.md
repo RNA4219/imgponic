@@ -1,7 +1,7 @@
 ---
 intent_id: imgponic-readme
 owner: imgponic-team
-status: active
+status: frozen
 last_reviewed_at: 2024-10-01
 next_review_due: 2025-04-01
 ---
@@ -14,6 +14,8 @@ next_review_due: 2025-04-01
 **License:** MIT
 
 **Theme:** main `#C4FCC4` / background `#FFFFEE`
+
+> **開発凍結中**：`tauri` GTK4 系依存が未解決のため、新機能開発とメンテナンスを停止しています（Issue #12563 等の上流対応待ち）。
 
 Imgponic は、**プロンプトとコードを“育てる”ためのローカルツール**です。
 左右2ペインで編集→整形→反映のループを高速に回せます。
