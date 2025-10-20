@@ -29,7 +29,7 @@ owner: workflow-qa
 
 ## 再開前提
 
-- 依存ライブラリの GTK4 対応状況は [`docs/gtk4_links.md`](./gtk4_links.md) のウォッチリストで月次点検し、再開判断の材料とする。
+- 依存ライブラリの GTK4 対応状況は [`docs/gtk4_links.md`](./gtk4_links.md) のウォッチリストで月次点検し、`reports/gtk4-links/report.{json,md}` に蓄積されたスクリプト結果を再開判断の材料とする。
 
 ## 再開判断フロー
 
@@ -47,6 +47,7 @@ owner: workflow-qa
 | TypeScript テスト | `npm run test` | UI 層の回帰を検知する（JSDOM） |
 | Node.js テスト | `npm run test:node` | Node ランタイムでのユーティリティ回帰を検知する |
 | Rust | `cargo test` | Tauri バックエンドと GTK4 依存コードの健全性を確認 |
+| GTK4 依存状況レポート | `npx tsx tools/sunset/gtk4LinkMonitor.ts --config tools/sunset/gtk4Links.config.json --out reports/gtk4-links` | 月次レビュー用に最新リンク状態を JSON/Markdown へ出力 |
 | E2E/環境 | `npm run ci:assert-gtk-stack` | GTK4 対応バージョンの依存欠落を早期検知 |
 
 ## 必要リソース一覧（Ollamaモデル、GTK4対応状況）

@@ -1,0 +1,61 @@
+[
+  {
+    "id": "tauri-tao-pr-1104",
+    "url": "https://github.com/tauri-apps/tao/pull/1104",
+    "type": "git",
+    "repositoryPath": "data/mirrors/tauri-apps-tao",
+    "branch": "pr-1104",
+    "stalenessDays": 14
+  },
+  {
+    "id": "conradhale-tao",
+    "url": "https://github.com/conradhale/tao",
+    "type": "git",
+    "repositoryPath": "data/mirrors/conradhale-tao",
+    "branch": "main",
+    "stalenessDays": 30
+  },
+  {
+    "id": "conradhale-wry",
+    "url": "https://github.com/conradhale/wry",
+    "type": "git",
+    "repositoryPath": "data/mirrors/conradhale-wry",
+    "branch": "main",
+    "stalenessDays": 30
+  },
+  {
+    "id": "tauri-issue-11928",
+    "url": "https://github.com/tauri-apps/tauri/issues/11928",
+    "type": "rss",
+    "feedPath": "data/feeds/tauri-issue-11928.xml",
+    "stalenessDays": 14
+  },
+  {
+    "id": "muda-issue-259",
+    "url": "https://github.com/tauri-apps/muda/issues/259",
+    "type": "rss",
+    "feedPath": "data/feeds/muda-issue-259.xml",
+    "stalenessDays": 14
+  },
+  {
+    "id": "tauri-runtime-wry-docs",
+    "url": "https://docs.rs/tauri-runtime-wry",
+    "type": "rss",
+    "feedPath": "data/feeds/tauri-runtime-wry-releases.xml",
+    "stalenessDays": 30
+  },
+  {
+    "id": "gnome-gtk4-tray-forum",
+    "url": "https://discourse.gnome.org/t/system-tray-icons-in-gtk4/22615",
+    "type": "rss",
+    "feedPath": "data/feeds/gnome-gtk4-tray.xml",
+    "stalenessDays": 30
+  },
+  {
+    "id": "tauri-architecture-guide",
+    "url": "https://v2.tauri.app/concept/architecture/",
+    "type": "rss",
+    "feedPath": "data/feeds/tauri-architecture.xml",
+    "stalenessDays": 30
+  }
+]
