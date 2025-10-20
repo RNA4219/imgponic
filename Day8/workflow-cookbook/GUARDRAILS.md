@@ -2,11 +2,11 @@
 intent_id: INT-001
 owner: your-handle
 status: deprecated   # draft|active|deprecated
-last_reviewed_at: 2025-03-17
-next_review_due: 2025-09-17
+last_reviewed_at: 2025-10-20
+next_review_due: 2026-04-20
 ---
 
-# 本資料は 2025-03-17 付で後継ガイドラインへ統合されたため凍結しており、詳細は docs/SUNSET_PLAN.md を参照してください。
+# 本資料は 2025-10-20 付で後継ガイドラインへ統合されたため凍結しており、詳細は docs/SUNSET_PLAN.md を参照してください。
 
 # Guardrails & 行動指針
 
