@@ -6,7 +6,7 @@ last_reviewed_at: 2025-10-20
 next_review_due: 2026-04-20
 ---
 
-# 本資料は 2025-10-20 時点で後継プロセスへ移行済みのため凍結しており、詳細は docs/SUNSET_PLAN.md を参照してください。
+> **Note:** 本資料は 2025-10-20 時点で後継プロセスへ移行済みのため凍結しており、詳細は docs/SUNSET_PLAN.md を参照してください。
 
 # Agent Tool Policy — Dual Stack
 
