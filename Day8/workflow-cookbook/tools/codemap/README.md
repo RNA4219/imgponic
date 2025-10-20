@@ -1,42 +1,38 @@
 # codemap ツール
 
-`codemap.update` は Birdseye のインデックスおよびカプセルを再生成するコマンドです。現時点ではローカル実行を前提としており、
-標準では直近変更ファイルから±2 hop のカプセルのみ更新します。今後導入予定の `--full` オプションを指定した場合、全カプセルを再生成します。
-以下の手順で最新化します。
+`codemap.update` は Birdseye のインデックス (`docs/birdseye/index.json`) とカプセル (`docs/birdseye/caps/*.json`) を、対象ルート配下の Markdown front matter に記載されたメタデータへ同期するユーティリティです。front matter から抽出した値は `metadata` フィールドとして各ノードへ反映され、`generated_at` が最新の更新時刻へ差し替えられます。
 
 ## 依存
 
 - Python 3.11 以上
-- 追加の外部ライブラリは不要（標準ライブラリのみで実行できます）
+- 追加ライブラリ不要（標準ライブラリのみ）
 
 ## 実行手順
 
 1. （任意）仮想環境を作成し、有効化します。
-2. リポジトリルートで次のコマンドを実行します。
+2. Birdseye を含むルート（例: `Day8/workflow-cookbook/`）で次のコマンドを実行します。
 
    ```bash
-   python tools/codemap/update.py --targets docs/birdseye/index.json --emit index+caps
+   python tools/codemap/update.py --targets . --emit index+caps
    ```
 
-   - `--targets` には再生成したい Birdseye リソースをカンマ区切りで指定します。
-   - `--emit` には出力したい成果物（`index` / `caps` / `index+caps`）を指定します。
-   - 直近変更箇所から±2 hop のカプセルのみ更新されます。
-3. 実行後、以下の成果物が更新されます。
-   - `docs/birdseye/index.json`
-   - `docs/birdseye/caps/*.json`
+3. 生成された `docs/birdseye/index.json` と `docs/birdseye/caps/*.json` を確認し、問題がなければコミットします。
 
-## Birdseye 再生成スクリプト
+## CLI オプション
 
-`update.py` は Birdseye の再生成処理を司るエントリーポイントです。現状は雛形実装であり、各ターゲットの解析や JSON 生成ロジックを実装する必要があります。詳細な処理を追加する際は、既存の例外設計・型安全方針に従って実装してください。
+- `--targets`: 解析対象ルートをカンマ区切りで指定します。各ルート配下の Markdown front matter を読み取り、対応する Birdseye
+  アセットへ反映します。複数指定した場合は順番に解析されます。
+- `--emit`: 書き戻すアセットを選択します。`index`（インデックスのみ）、`caps`（カプセルのみ）、`index+caps`（両方）のいずれかを指定します。
 
-- CLI エントリ: `python tools/codemap/update.py ...`
-- 未実装箇所は `TODO` コメントで明示しています。今後の拡張時に置き換えてください。
+## 同期フロー
 
-### `--full` オプション（導入予定）
+1. front matter に `intent_id`, `owner`, `status`, `last_reviewed_at`, `next_review_due` などのメタデータを記載します。
+2. `python tools/codemap/update.py --targets <root> --emit index+caps` を実行します。
+3. `metadata` フィールドが各ノードやカプセルへ追加され、`generated_at` が更新されたことを `git diff docs/birdseye/` で確認します。
+4. 後継仕様へ移行する際は front matter 側を更新し、同コマンドを再実行して Birdseye の鮮度を保ちます。
 
-`--full` を指定すると Birdseye の全カプセルを再生成します。リポジトリ構造の大幅な変更や、カプセルの鮮度が不明な状態からの復旧時に利用する想定です。
-対象ファイル数に比例して処理時間が大幅に増加するため、通常運用では標準の±2 hop 更新を利用してください。
+## トラブルシューティング
 
-```bash
-python tools/codemap/update.py --caps docs/birdseye/caps --root . --full
-```
+- `--emit index` を指定すると `index.json` のみが更新され、既存カプセルは保持されます。
+- `--emit caps` を指定すると `caps/*.json` のみが更新されます。部分的に再同期したい場合に利用してください。
+- 対象ルートに `docs/birdseye/` が存在しない場合、スクリプトは警告を表示して処理をスキップします。
