@@ -8,6 +8,8 @@ next_review_due: 2025-11-14
 
 # Runbook
 
+> 凍結期間の運用と資産保全手順は [`docs/SUNSET_PLAN.md`](../../docs/SUNSET_PLAN.md) を優先参照すること。
+
 ## Environments
 
 - **Local**
