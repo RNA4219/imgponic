@@ -6,7 +6,7 @@ last_reviewed_at: 2025-10-20
 next_review_due: 2026-04-20
 ---
 
-# 本資料は 2025-10-20 に後継設計ドキュメントへ移行済みのため凍結されており、詳細は docs/SUNSET_PLAN.md を参照してください。
+> **Note:** 本資料は 2025-10-20 に後継設計ドキュメントへ移行済みのため凍結されており、詳細は docs/SUNSET_PLAN.md を参照してください。
 
 # Blueprint
 
