@@ -22,4 +22,21 @@ jobs:
             **/*.md
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+  gtk4-sunset-monitor:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run GTK4 sunset monitor
+        run: npx tsx tools/sunset/linkMonitor.ts --config tools/sunset/gtk4Links.config.ts --out reports
+      - name: Upload GTK4 monitor report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gtk4-link-monitor
+          path: reports
 

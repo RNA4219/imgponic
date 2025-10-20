@@ -7,15 +7,55 @@
 - 監視スクリプト: `npx tsx tools/sunset/gtk4LinkMonitor.ts --config tools/sunset/gtk4Links.config.json --out reports/gtk4-links` を実行し、`reports/gtk4-links/report.{json,md}` の結果を一次ソースとする（CI は `.github/workflows/gtk4-link-monitor.yml` で月次実行）。
 - 手動追記が必要な場合は `tools/sunset/gtk4Links.config.json` の `id` ごとにローカル mirror や RSS アーカイブを更新する。
 
-| リンク | 現状ステータス | 最終確認日 | 担当メモ |
-| --- | --- | --- | --- |
-| [tauri-apps/tao の GTK4 対応 PR](https://github.com/tauri-apps/tao/pull/1104) | `reports/gtk4-links/report.md` （ID: `tauri-tao-pr-1104`） | 2025-10-20 | ローカル mirror で `git fetch origin pull/1104/head:pr-1104` を実行し、ブランチを更新してからスクリプトを再実行する。 |
-| [conradhale/tao リポジトリ](https://github.com/conradhale/tao) | `reports/gtk4-links/report.md` （ID: `conradhale-tao`） | 2025-10-20 | `data/mirrors/conradhale-tao` を `git fetch --all --prune` で更新し、差分を確認。 |
-| [conradhale/wry リポジトリ](https://github.com/conradhale/wry) | `reports/gtk4-links/report.md` （ID: `conradhale-wry`） | 2025-10-20 | `data/mirrors/conradhale-wry` の `main` を更新後、GTK4 ブランチとの差分をレビュー。 |
-| [tauri-apps/tauri Issue #11928](https://github.com/tauri-apps/tauri/issues/11928) | `reports/gtk4-links/report.md` （ID: `tauri-issue-11928`） | 2025-10-20 | GitHub Atom フィード (`issues/11928.atom`) を取得して `data/feeds/tauri-issue-11928.xml` に保存。 |
-| [tauri-apps/muda Issue #259](https://github.com/tauri-apps/muda/issues/259) | `reports/gtk4-links/report.md` （ID: `muda-issue-259`） | 2025-10-20 | Issue フィードを `data/feeds/muda-issue-259.xml` に保存してからスクリプトを実行。 |
-| [tauri-runtime-wry のドキュメント](https://docs.rs/tauri-runtime-wry) | `reports/gtk4-links/report.md` （ID: `tauri-runtime-wry-docs`） | 2025-10-20 | `docs.rs` のリリースフィードを `data/feeds/tauri-runtime-wry-releases.xml` に保存。 |
-| [GNOME フォーラム: GTK4 のシステムトレイアイコン](https://discourse.gnome.org/t/system-tray-icons-in-gtk4/22615) | `reports/gtk4-links/report.md` （ID: `gnome-gtk4-tray-forum`） | 2025-10-20 | Discourse の RSS (`.rss`) を `data/feeds/gnome-gtk4-tray.xml` へ保存し更新点を確認。 |
-| [Tauri v2 アーキテクチャガイド](https://v2.tauri.app/concept/architecture/) | `reports/gtk4-links/report.md` （ID: `tauri-architecture-guide`） | 2025-10-20 | サイト更新を `wget` 等で取得し、`data/feeds/tauri-architecture.xml` を差し替える。 |
+- **tauri-apps/tao の GTK4 対応 PR**（[リンク][tao-pr]）
+  - 現状ステータス: 要確認（API403）
+  - 最終確認日: 2025-10-20
+  - 担当メモ: GitHub API が 403 を返すためマージ状況は VPN 復旧後に再確認。
+- **conradhale/tao リポジトリ**（[リンク][conradhale-tao]）
+  - 現状ステータス: 要確認（API403）
+  - 最終確認日: 2025-10-20
+  - 担当メモ: フォークの default branch 追従状況をブラウザから確認。
+- **conradhale/wry リポジトリ**（[リンク][conradhale-wry]）
+  - 現状ステータス: 要確認（API403）
+  - 最終確認日: 2025-10-20
+  - 担当メモ: GTK4 向けブランチの更新有無を手動で確認。
+- **tauri-apps/tauri Issue #11928**（[リンク][tauri-issue]）
+  - 現状ステータス: 要確認（API403）
+  - 最終確認日: 2025-10-20
+  - 担当メモ: Issue の open/close 進捗を確認し依存タスクへ反映。
+- **tauri-apps/muda Issue #259**（[リンク][muda-issue]）
+  - 現状ステータス: 要確認（API403）
+  - 最終確認日: 2025-10-20
+  - 担当メモ: GTK4 対応議論の更新点をサマリし共有。
+- **tauri-runtime-wry のドキュメント**（[リンク][runtime-wry-docs]）
+  - 現状ステータス: 要確認（API403）
+  - 最終確認日: 2025-10-20
+  - 担当メモ: docs.rs へ直接アクセス不可のためリリースノート経由で API 変化を把握。
+- **GNOME フォーラム: GTK4 のシステムトレイアイコン**（[リンク][gnome-forum]）
+  - 現状ステータス: 要確認（API403）
+  - 最終確認日: 2025-10-20
+  - 担当メモ: Discourse トピックの更新を確認し上流方針変更をチェック。
+- **Tauri v2 アーキテクチャガイド**（[リンク][tauri-architecture]）
+  - 現状ステータス: 要確認（API403）
+  - 最終確認日: 2025-10-20
+  - 担当メモ: オフライン環境のため公式サイト更新を手動で確認。
 
-※ GitHub/API への直接アクセスが遮断されているため、ローカル mirror やアーカイブを更新したうえでスクリプトの結果を参照する。
+※ GitHub/API へのアクセスが遮断されているため、現時点では手動確認者による追跡が必要。
+
+### 自動監視レポート
+
+- `npx tsx tools/sunset/linkMonitor.ts --config tools/sunset/gtk4Links.config.ts --out reports` を実行すると、
+  上記ウォッチリストの全リンクを対象にローカル mirror や手動取得したアーカイブ
+  (`data/gtk4/link-statuses.json`) を解析し、`reports/` 配下へ JSON/Markdown のレポートを生成する。
+- 月次レビュー前に `.github/workflows/links.yml` の `gtk4-sunset-monitor` ジョブが同コマンドをスケジュール実行し、
+  生成物をアーティファクト (`gtk4-link-monitor`) として保存する。
+- 自動判定結果は [`docs/SUNSET_PLAN.md`](./SUNSET_PLAN.md) の再開判断フローで参照し、手動チェックの代替として最新状況を確認する。
+
+[tao-pr]: https://github.com/tauri-apps/tao/pull/1104
+[conradhale-tao]: https://github.com/conradhale/tao
+[conradhale-wry]: https://github.com/conradhale/wry
+[tauri-issue]: https://github.com/tauri-apps/tauri/issues/11928
+[muda-issue]: https://github.com/tauri-apps/muda/issues/259
+[runtime-wry-docs]: https://docs.rs/tauri-runtime-wry
+[gnome-forum]: https://discourse.gnome.org/t/system-tray-icons-in-gtk4/22615
+[tauri-architecture]: https://v2.tauri.app/concept/architecture/
