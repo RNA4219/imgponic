@@ -29,15 +29,16 @@ owner: workflow-qa
 
 ## 再開前提
 
-- 依存ライブラリの GTK4 対応状況は [`docs/gtk4_links.md`](./gtk4_links.md) のウォッチリストで月次点検し、再開判断の材料とする。
+- 依存ライブラリの GTK4 対応状況は [`docs/gtk4_links.md`](./gtk4_links.md) のウォッチリストと `reports/` 配下の自動監視レポート（`gtk4-link-monitor-*.json` / `.md`）で月次点検し、再開判断の材料とする。
 
 ## 再開判断フロー
 
 1. `Day8/workflow-cookbook/BLUEPRINT.md`・`Day8/workflow-cookbook/RUNBOOK.md` の凍結告知を再確認し、再開時にも参照元が最新方針と矛盾しないかを確認する。
-2. [`Day8/docs/day8/README.md`](../Day8/docs/day8/README.md) と `Day8/docs/day8/` 配下の後継仕様を点検し、差分取り込みの必要性を評価する。
-3. 下記「必要リソース一覧」と「再開前に実行する確認コマンド」の要件を満たすかをチェックし、満たさない場合はタスク化してフォローアップスケジュールへ登録する。
-4. レビュー担当が「フォローアップスケジュール」で定義された判定条件を満たしたかを確認し、`workflow-qa` へ再開可否を報告する。
-5. 再開可と判断した場合は本ドキュメントと Blueprint/Runbook の凍結告知を更新し、凍結解除日と再開理由を明記する。
+2. [`tools/sunset/linkMonitor.ts`](../tools/sunset/linkMonitor.ts) で生成された最新レポート（`reports/gtk4-links-*.json`）を参照し、ウォッチリストのリンクが直近の mirror/アーカイブ情報に基づいて更新済みかを確認する。
+3. [`Day8/docs/day8/README.md`](../Day8/docs/day8/README.md) と `Day8/docs/day8/` 配下の後継仕様を点検し、差分取り込みの必要性を評価する。
+4. 下記「必要リソース一覧」と「再開前に実行する確認コマンド」の要件を満たすかをチェックし、満たさない場合はタスク化してフォローアップスケジュールへ登録する。
+5. レビュー担当が「フォローアップスケジュール」で定義された判定条件を満たしたかを確認し、`workflow-qa` へ再開可否を報告する。
+6. 再開可と判断した場合は本ドキュメントと Blueprint/Runbook の凍結告知を更新し、凍結解除日と再開理由を明記する。
 
 ## 再開前に実行する確認コマンド（npm run test / cargo test 等）
 

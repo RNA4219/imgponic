@@ -17,3 +17,9 @@
 | [Tauri v2 アーキテクチャガイド](https://v2.tauri.app/concept/architecture/) | 要確認（API403） | 2025-10-20 | オフライン環境のため公式サイト更新を手動で確認。 |
 
 ※ GitHub/API へのアクセスが遮断されているため、現時点では手動確認者による追跡が必要。
+
+### 自動監視レポート
+
+- `npx tsx tools/sunset/linkMonitor.ts --config tools/sunset/gtk4Links.config.ts --out reports` を実行すると、上記テーブルの全リンクを対象にローカル mirror や手動取得したアーカイブ (`data/gtk4/link-statuses.json`) を解析し、`reports/` 配下へ JSON/Markdown のレポートを生成する。
+- 月次レビュー前に `.github/workflows/links.yml` の `gtk4-sunset-monitor` ジョブが同コマンドをスケジュール実行し、生成物をアーティファクト (`gtk4-link-monitor`) として保存する。
+- 自動判定結果は [`docs/SUNSET_PLAN.md`](./SUNSET_PLAN.md) の再開判断フローで参照し、手動チェックの代替として最新状況を確認する。
