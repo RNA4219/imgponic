@@ -4,6 +4,8 @@
 
 - 月次確認サイクル: 月次レビュー（毎月第1営業日）に棚卸しを実施。
 - 担当者ローテーション: `workflow-qa` → `runtime-maintainers` → `docs-support` の順に月単位で交代し、完了報告は `#imgponic-governance` チャンネルへ掲示。
+- 監視スクリプト: `npx tsx tools/sunset/gtk4LinkMonitor.ts --config tools/sunset/gtk4Links.config.json --out reports/gtk4-links` を実行し、`reports/gtk4-links/report.{json,md}` の結果を一次ソースとする（CI は `.github/workflows/gtk4-link-monitor.yml` で月次実行）。
+- 手動追記が必要な場合は `tools/sunset/gtk4Links.config.json` の `id` ごとにローカル mirror や RSS アーカイブを更新する。
 
 - **tauri-apps/tao の GTK4 対応 PR**（[リンク][tao-pr]）
   - 現状ステータス: 要確認（API403）

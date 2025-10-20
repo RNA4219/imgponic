@@ -1,0 +1,29 @@
+name: gtk4-link-monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 1 1 * *'
+
+permissions:
+  contents: read
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Generate GTK4 link report
+        run: >-
+          npx tsx tools/sunset/gtk4LinkMonitor.ts
+          --config tools/sunset/gtk4Links.config.json
+          --out reports/gtk4-links
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gtk4-link-monitor-report
+          path: reports/gtk4-links

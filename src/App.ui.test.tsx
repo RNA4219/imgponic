@@ -642,6 +642,84 @@ domTest('Ctrl/Cmd+Shift+F toggles focus mode and reset button restores layout', 
   }
 })
 
+domTest('Ctrl/Cmd+Shift+F syncs focusTarget with the active pane', async () => {
+  appMockContainer.__APP_MOCKS__ = {
+    useSetupCheck: () => ({
+      status: 'ready',
+      guidance: '',
+      retry: vi.fn(async () => {})
+    }),
+    useOllamaStream: () => ({
+      ...noopStream
+    }),
+    invoke: async (cmd: string) => {
+      if (cmd === 'read_workspace') return null
+      if (cmd === 'write_workspace') return 'ok'
+      if (cmd === 'list_project_files') return []
+      if (cmd === 'compose_prompt') return { final_prompt: 'SYS\n---\nUSER_INPUT', sha256: 'hash', model: 'm' }
+      if (cmd === 'run_ollama_stream') return undefined
+      return undefined
+    }
+  }
+
+  const container = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(container)
+
+  const dispatchShortcut = async () => {
+    const event = new KeyboardEvent('keydown', { key: 'F', ctrlKey: true, shiftKey: true, bubbles: true })
+    window.dispatchEvent(event)
+    await flushEffects()
+  }
+
+  try {
+    await act(async () => {
+      root.render(<App />)
+    })
+
+    const leftTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="left"]'),
+      'left textarea'
+    )
+    if (!(leftTextarea instanceof HTMLTextAreaElement)) throw new Error('Expected left textarea')
+
+    const rightTextarea = await waitForElement(
+      () => container.querySelector('textarea[data-side="right"]'),
+      'right textarea'
+    )
+    if (!(rightTextarea instanceof HTMLTextAreaElement)) throw new Error('Expected right textarea')
+
+    await act(async () => {
+      leftTextarea.focus()
+    })
+    await dispatchShortcut()
+
+    const leftToggle = await waitForElement(
+      () => container.querySelector('[data-testid="focus-toggle-left"]') as HTMLButtonElement | null,
+      'left focus toggle'
+    )
+    expect(leftToggle.getAttribute('aria-pressed')).toBe('true')
+
+    await dispatchShortcut()
+    expect(leftToggle.getAttribute('aria-pressed')).toBe('false')
+
+    await act(async () => {
+      rightTextarea.focus()
+    })
+    await dispatchShortcut()
+
+    const rightToggle = await waitForElement(
+      () => container.querySelector('[data-testid="focus-toggle-right"]') as HTMLButtonElement | null,
+      'right focus toggle'
+    )
+    expect(rightToggle.getAttribute('aria-pressed')).toBe('true')
+  } finally {
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  }
+})
+
 domTest('renders setup guidance banner when model is missing', async () => {
   appMockContainer.__APP_MOCKS__ = {
     useSetupCheck: () => ({

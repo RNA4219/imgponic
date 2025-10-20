@@ -617,52 +617,61 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey
-      if (mod && e.shiftKey && e.key.toLowerCase() === 'f') {
-        e.preventDefault()
-        setFocusedPanel(prev => {
-          if (prev) return null
-          const active = document.activeElement
-          if (active && leftTextRef.current && leftTextRef.current.contains(active as Node)) {
-            return 'left'
-          }
-          if (active && rightTextRef.current && rightTextRef.current.contains(active as Node)) {
-            return 'right'
-          }
-          return 'left'
-        })
-        return
+      const lowerKey = e.key.toLowerCase()
+      let handled = false
+
+      const resolveActiveSide = (): 'left' | 'right' | null => {
+        if (typeof document === 'undefined') return null
+        const activeElement = document.activeElement
+        if (!activeElement) return null
+        if (activeElement instanceof HTMLElement) {
+          const side = activeElement.getAttribute('data-side')
+          if (side === 'left' || side === 'right') return side
+        }
+        if (leftTextRef.current?.contains(activeElement)) return 'left'
+        if (rightTextRef.current?.contains(activeElement)) return 'right'
+        return null
       }
-      if (mod && e.key === 'Enter') { e.preventDefault(); runOllama() }
-      if (mod && e.key.toLowerCase() === 's') {
+
+      if (mod && e.shiftKey && lowerKey === 'f') {
+        handled = true
+        e.preventDefault()
+        const activeSide = resolveActiveSide()
+        setFocusedPanel(prev => (prev ? null : activeSide ?? 'left'))
+        setFocusTarget(prev => {
+          const fallback = prev ?? 'left'
+          const nextTarget = activeSide ?? fallback
+          return prev === nextTarget ? null : nextTarget
+        })
+      }
+
+      if (mod && e.key === 'Enter') {
+        handled = true
+        e.preventDefault()
+        runOllama()
+      }
+
+      if (mod && lowerKey === 's') {
+        handled = true
         e.preventDefault()
         saveLeftToProject()
       }
-      if (mod && e.key.toLowerCase() === 'c') {
+
+      if (mod && lowerKey === 'c') {
+        handled = true
         e.preventDefault()
         copy(rightText)
       }
-      if (mod && e.shiftKey && e.key.toLowerCase() === 'f') {
-        e.preventDefault()
-        setFocusTarget(prev => {
-          const activeElement = typeof document !== 'undefined' ? document.activeElement : null
-          const activeSide = (() => {
-            if (!activeElement || !(activeElement instanceof HTMLElement)) return null
-            const side = activeElement.getAttribute('data-side')
-            return side === 'left' || side === 'right' ? side : null
-          })()
-          const nextTarget = activeSide ?? prev ?? 'left'
-          return prev === nextTarget ? null : nextTarget
-        })
-        return
-      }
 
-      let preventOverlayToggle = false
-      setShowKeybindOverlay(prev => {
-        const next = resolveKeybindOverlayState(prev, e)
-        if (next !== prev) preventOverlayToggle = true
-        return next
-      })
-      if (preventOverlayToggle) e.preventDefault()
+      if (!handled) {
+        let preventOverlayToggle = false
+        setShowKeybindOverlay(prev => {
+          const next = resolveKeybindOverlayState(prev, e)
+          if (next !== prev) preventOverlayToggle = true
+          return next
+        })
+        if (preventOverlayToggle) e.preventDefault()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
