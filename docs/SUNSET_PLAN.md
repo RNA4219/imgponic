@@ -38,10 +38,15 @@ owner: workflow-qa
 
 ## チェックリスト
 
-- [ ] [`project/recipe-digest.template.md`](../project/recipe-digest.template.md) に従ってダイジェストを更新し、`pnpm tsx tools/sunset/recipeDigest.ts --output project/recipe-digest.md` を実行した結果を確認する。
+- [ ] [`project/recipe-digest.template.md`](../project/recipe-digest.template.md) に従ってダイジェストを更新し、
+  `pnpm tsx tools/sunset/recipeDigest.ts --output project/recipe-digest.md` を実行した結果を確認する。
+
 ## 資産保全
 
-- `runs/` 配下の最新ログは `npx tsx tools/sunset/archiveRuns.ts --runs runs --limit 5 --out archives` で一括アーカイブする。
-- コマンド成功時に `archives/` 配下へ `*.tar.gz` と `*.sha256.json` が生成される。マニフェスト内の SHA-256 をもとに転送先で整合性を確認すること。
-- JSONL 破損などで失敗した場合はエラー内容を修正してから再実行し、`NoRunsFoundError` が出た場合は新規ログの生成を待ってから再試行する。
+- `runs/` 配下の最新ログは `npx tsx tools/sunset/archiveRuns.ts --runs runs --limit 5 --out archives`
+  で一括アーカイブする。
+- コマンド成功時に `archives/` 配下へ `*.tar.gz` と `*.sha256.json` が生成される。マニフェスト内の
+  SHA-256 をもとに転送先で整合性を確認すること。
+- JSONL 破損などで失敗した場合はエラー内容を修正してから再実行し、`NoRunsFoundError` が出た場合は
+  新規ログの生成を待ってから再試行する。
 

@@ -82,6 +82,7 @@
 ## Tauri GTK4 アップグレード検証ログ
 
 ## 2025-10-19 試行メモ
+
 - `cargo test --test glib_stack --features security` を実行すると、`glib-sys v0.18.1` がシステムの `glib-2.0` を要求して
   ビルドスクリプトで失敗（GTK3 ランタイム未導入が原因）。【7be280†L1-L29】【c3427b†L1-L30】
 - `cargo deny check bans` を実行し、`tauri` 2.8.5 由来の `glib = 0.18.5` が ban 設定に抵触することを確認。
@@ -90,8 +91,8 @@
 - **Next action:** 上流で GTK4/GLib ≥0.20 へ移行済みのリリース（または互換パッチ）が出次第、`deny.toml` を再更新し
   `glib` 0.20 以上を再要求する。
 - `[patch.crates-io]` へ以下を設定し `cargo update -p wry` を実行。
-    - `conradhale/tao` (`rev=0fa97b7e3288bdda4b1a43a58117cdb154206d68`)
-    - `conradhale/wry` (`rev=fdce27aca03b79682cb7779483bd69d25f0134c6`)
+  - `conradhale/tao` (`rev=0fa97b7e3288bdda4b1a43a58117cdb154206d68`)
+  - `conradhale/wry` (`rev=fdce27aca03b79682cb7779483bd69d25f0134c6`)
 - しかし `tauri` が要求する `tao = "^0.34.4"` / `wry = "^0.53.4"` に対し、該当コミットの crate version は
   `tao = 0.32.8` / `wry = 0.50.5` で不一致のためパッチが適用されず、GTK4 系依存へ切り替わらない。
 - `muda` の `feat/gtk4` ブランチ (`rev=3a29ee8418909e6af829c2f84c8005578340c48d`) も同様に `0.15.3` で、
@@ -108,6 +109,7 @@ Patch `wry v0.50.5` (conradhale/wry@fdce27ac) was not used in the crate graph.
 ```
 
 ## 2025-02-14 試行メモ
+
 - `cargo clippy --all-targets --all-features -- -D warnings` を実行したところ、`tauri` に `gtk4` feature が存在せず依存関係の解決に失敗。
 - `Cargo.toml` では `gtk4` feature が `tauri/gtk4` を要求しているが、現在公開されている `tauri v2.8.5` には該当 feature が未実装のため解消不可。
 - `tauri` 側で `gtk4` feature を提供するブランチ公開待ち。既存の `[patch.crates-io]` 設定でも feature は追加されていないことを確認した。
@@ -136,6 +138,7 @@ failed to select a version for `tauri` which could resolve this conflict
 - 備考: CI でも同スクリプトを実行するよう `.github/workflows/rust.yml` を更新済み。
 
 ## 2025-02-16 試行メモ
+
 - `cargo clippy --all-targets --all-features -- -D warnings` を実行したが、`glib-sys` のビルドがシステムライブラリ不足で失敗。
 - `pkg-config` が `glib-2.0` を検出できず、`tools/pkg-config-webkit.sh` により `glib-2.0 >= 2.70` を要求するが CI コンテナには未導入。
 - `PKG_CONFIG_PATH` を設定しても `.pc` が存在しないため、glib の開発パッケージを追加インストールするまで解消不可。
@@ -158,6 +161,7 @@ Caused by:
 ```
 
 ## 2025-02-15 試行メモ
+
 - `cargo test --all-features --workspace` を実行したところ、`tauri` の `gtk4` feature が存在しないため依存関係の解決に失敗。
 - 実行ログを `target/test.log` に保存済み。エラー内容は `tauri` が `gtk4` feature を提供していない点で、`promptforge` の依存関係が満たせなかった。
 
@@ -175,9 +179,11 @@ failed to select a version for `tauri` which could resolve this conflict
 ```
 
 ## 2025-10-19 `cargo fmt --all` 実行ログ
+
 - 結果: 成功（差分なし）
 
 ## 2025-10-19 glib_stack テスト失敗再確認
+
 - `cargo test --test glib_stack --no-default-features --features security` を実行し、`tests/security/glib_stack.rs`
   の `glib >= 0.20.0` アサーションが継続して失敗することを確認。
 - `rg 'name = "glib"' -n Cargo.lock` / `rg 'name = "gtk"' -n Cargo.lock` により、ロックファイル上の
