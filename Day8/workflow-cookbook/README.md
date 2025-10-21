@@ -105,6 +105,13 @@ workflow-cookbook/logs/       # 実行ログ（ローテーション不要）
 
 > バッジ値は `governance/policy.yaml` の `slo` と同期。更新時は同ファイルの値を修正し、上記3つのバッジ表示を揃える。
 
+## License
+
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0)
+
+Apache-2.0。テンプレートやスクリプトを他プロジェクトにコピーする場合でも、ファイル
+自体のライセンスは Apache-2.0 のまま維持し、再配布時は `NOTICE` を含めてください。
+
 ### Commit message guide
 
 - feat: 〜 を追加

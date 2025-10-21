@@ -29,6 +29,13 @@ Day8 を新しいリポジトリへ導入する際は、[`INSTALL.md`](INSTALL.m
 - 生成されたレポート（`workflow-cookbook/reports/` 配下）と提案を確認し、人間が修正
   PR を作成する運用を前提としています。
 
+## License
+
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0)
+
+Apache-2.0。別リポジトリにファイルをコピーする場合でも、そのファイルは Apache-2.0
+のままであり、再配布時は `workflow-cookbook/NOTICE` を保持してください。
+
 ---
 
 **キーワード**: Day8, safe autonomy, propose-only CI, reflective devops

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 RNA4219
+
 """Birdseyeインデックスとカプセルを再生成するスクリプト。"""
 
 from __future__ import annotations
