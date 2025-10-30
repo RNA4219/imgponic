@@ -28,7 +28,7 @@ const MASK_PATTERNS: readonly MaskPattern[] = [
   },
   {
     type: 'AWS_SECRET_KEY',
-    regex: /aws(.{0,20})?(secret|access).{0,20}?([A-Za-z0-9/+=]{40})/gi
+    regex: /aws(?:.{1,20}?)?(secret|access).{1,20}?([A-Za-z0-9/+=]{40})/gi
   }
 ]
 
