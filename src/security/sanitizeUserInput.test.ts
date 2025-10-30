@@ -33,6 +33,16 @@ describe('sanitizeUserInput', () => {
     ])
   })
 
+  it('skips masking when AWS secret key value lacks a separator before the body', () => {
+    const almostSecret = `aws secret${'A'.repeat(40)}`
+
+    const result = sanitizeUserInput(almostSecret)
+
+    expect(result.sanitized).toBe(almostSecret)
+    expect(result.maskedTypes).toEqual([])
+    expect(result.overLimit).toBe(false)
+  })
+
   it('flags over-limit input without altering text', () => {
     const longText = 'a'.repeat(40001)
     const result = sanitizeUserInput(longText)
